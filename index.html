@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="theme-color" content="#6366f1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Mis Gastos" />
+  <meta name="description" content="Control de gastos fijos, temporales, ingresos y proyección mensual" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <title>Mis Gastos</title>
+</head>
+<body>
+  <!-- App shell -->
+  <div id="app" class="app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-top">
+        <div class="header-title">
+          <h1>Mis Gastos</h1>
+          <p class="header-subtitle" id="headerSubtitle">Cargando…</p>
+        </div>
+        <div class="header-actions">
+          <button class="icon-btn" id="btnPrevMonth" aria-label="Mes anterior">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <button class="month-pill" id="currentMonthPill" aria-label="Mes actual">
+            <span id="currentMonthLabel">—</span>
+          </button>
+          <button class="icon-btn" id="btnNextMonth" aria-label="Mes siguiente">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="app-main" id="appMain">
+      <!-- View: Resumen -->
+      <section class="view view-active" data-view="resumen">
+        <!-- Summary cards -->
+        <div class="summary-grid">
+          <div class="summary-card summary-income">
+            <div class="summary-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div class="summary-info">
+              <span class="summary-label">Ingresos</span>
+              <span class="summary-value" id="sumIncome">0,00</span>
+            </div>
+          </div>
+          <div class="summary-card summary-expense">
+            <div class="summary-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+            </div>
+            <div class="summary-info">
+              <span class="summary-label">Gastos</span>
+              <span class="summary-value" id="sumExpense">0,00</span>
+            </div>
+          </div>
+          <div class="summary-card summary-balance" id="balanceCard">
+            <div class="summary-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="summary-info">
+              <span class="summary-label">Balance</span>
+              <span class="summary-value" id="sumBalance">0,00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick add -->
+        <div class="quick-actions">
+          <button class="quick-btn quick-btn-expense" data-add="expense">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Añadir gasto
+          </button>
+          <button class="quick-btn quick-btn-income" data-add="income">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Añadir ingreso
+          </button>
+        </div>
+
+        <!-- Month items -->
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Detalle del mes</h2>
+            <span class="section-meta" id="monthItemCount">0 movimientos</span>
+          </div>
+          <div class="items-list" id="monthItemsList">
+            <div class="empty-state">
+              <div class="empty-icon">📋</div>
+              <p>No hay movimientos para este mes.</p>
+              <p class="empty-hint">Añade un gasto o ingreso para empezar.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View: Gastos -->
+      <section class="view" data-view="gastos">
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Todos los gastos</h2>
+            <button class="text-btn" id="btnNewExpense">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nuevo
+            </button>
+          </div>
+          <div class="filter-chips" id="expenseFilters">
+            <button class="chip chip-active" data-filter="all">Todos</button>
+            <button class="chip" data-filter="fixed">Fijos</button>
+            <button class="chip" data-filter="temporary">Temporales</button>
+            <button class="chip" data-filter="variable">Variables</button>
+          </div>
+          <div class="items-list" id="allExpensesList">
+            <div class="empty-state">
+              <div class="empty-icon">💸</div>
+              <p>No hay gastos todavía.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View: Ingresos -->
+      <section class="view" data-view="ingresos">
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Todos los ingresos</h2>
+            <button class="text-btn" id="btnNewIncome">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nuevo
+            </button>
+          </div>
+          <div class="items-list" id="allIncomeList">
+            <div class="empty-state">
+              <div class="empty-icon">💰</div>
+              <p>No hay ingresos todavía.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View: Histórico -->
+      <section class="view" data-view="historico">
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Línea de tiempo</h2>
+            <span class="section-meta" id="timelineCount">0 meses</span>
+          </div>
+          <div class="items-list" id="timelineList">
+            <div class="empty-state">
+              <div class="empty-icon">📅</div>
+              <p>Añade gastos o ingresos para ver tu línea de tiempo.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View: Ajustes -->
+      <section class="view" data-view="ajustes">
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Ajustes</h2>
+          </div>
+          <div class="settings-list">
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">Moneda</div>
+                <div class="setting-hint">Símbolo usado en importes</div>
+              </div>
+              <select id="settingCurrency" class="setting-input">
+                <option value="EUR">€ Euro</option>
+                <option value="USD">$ Dólar</option>
+                <option value="GBP">£ Libra</option>
+                <option value="MXN">$ Peso MX</option>
+                <option value="ARS">$ Peso AR</option>
+                <option value="COP">$ Peso CO</option>
+                <option value="CLP">$ Peso CL</option>
+              </select>
+            </div>
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">Tema</div>
+                <div class="setting-hint">Sigue el sistema o forzar claro/oscuro</div>
+              </div>
+              <select id="settingTheme" class="setting-input">
+                <option value="auto">Automático</option>
+                <option value="light">Claro</option>
+                <option value="dark">Oscuro</option>
+              </select>
+            </div>
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">Día de inicio de mes</div>
+                <div class="setting-hint">Cuándo empieza el mes para ti (1-28)</div>
+              </div>
+              <select id="settingStartDay" class="setting-input">
+                <!-- opciones generadas dinámicamente -->
+              </select>
+            </div>
+          </div>
+
+          <div class="section-header" style="margin-top:24px">
+            <h2 class="section-title">Datos</h2>
+          </div>
+          <div class="settings-list">
+            <button class="action-row" id="btnExport">
+              <div class="action-icon" style="background:rgba(99,102,241,.12);color:#6366f1">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </div>
+              <div class="action-text">
+                <div class="action-label">Exportar datos</div>
+                <div class="action-hint">Descarga un JSON con todos tus datos</div>
+              </div>
+            </button>
+            <button class="action-row" id="btnImport">
+              <div class="action-icon" style="background:rgba(16,185,129,.12);color:#10b981">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <div class="action-text">
+                <div class="action-label">Importar datos</div>
+                <div class="action-hint">Carga un JSON exportado previamente</div>
+              </div>
+            </button>
+            <button class="action-row" id="btnSeed">
+              <div class="action-icon" style="background:rgba(245,158,11,.12);color:#f59e0b">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              </div>
+              <div class="action-text">
+                <div class="action-label">Cargar datos de ejemplo</div>
+                <div class="action-hint">Añade gastos/ingresos de prueba</div>
+              </div>
+            </button>
+            <button class="action-row action-danger" id="btnReset">
+              <div class="action-icon" style="background:rgba(239,68,68,.12);color:#ef4444">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+              </div>
+              <div class="action-text">
+                <div class="action-label">Borrar todo</div>
+                <div class="action-hint">Elimina todos los datos locales</div>
+              </div>
+            </button>
+          </div>
+
+          <div class="about-box">
+            <p><strong>Mis Gastos</strong> · v1.0</p>
+            <p>Tus datos se guardan solo en este dispositivo. Usa Exportar/Importar para moverlos entre dispositivos.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom navigation -->
+    <nav class="bottom-nav" role="tablist">
+      <button class="nav-item nav-active" data-nav="resumen" role="tab">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Resumen</span>
+      </button>
+      <button class="nav-item" data-nav="gastos" role="tab">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span>Gastos</span>
+      </button>
+      <button class="nav-item" data-nav="ingresos" role="tab">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        <span>Ingresos</span>
+      </button>
+      <button class="nav-item" data-nav="historico" role="tab">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Histórico</span>
+      </button>
+      <button class="nav-item" data-nav="ajustes" role="tab">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Ajustes</span>
+      </button>
+    </nav>
+
+    <!-- FAB (visible solo en resumen) -->
+    <button class="fab" id="fabAdd" aria-label="Añadir">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+
+    <!-- Modal: Add/Edit Expense -->
+    <div class="modal" id="modalExpense" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet" role="dialog" aria-labelledby="expenseTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="expenseTitle">Nuevo gasto</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="formExpense" class="form">
+          <input type="hidden" id="expenseId" />
+          <div class="field">
+            <label for="expenseName">Concepto</label>
+            <input type="text" id="expenseName" required maxlength="60" placeholder="Ej. Netflix, Alquiler, Préstamo coche…" />
+          </div>
+          <div class="field-row">
+            <div class="field field-grow">
+              <label for="expenseAmount">Importe</label>
+              <input type="number" id="expenseAmount" required min="0" step="0.01" inputmode="decimal" placeholder="0,00" />
+            </div>
+            <div class="field">
+              <label for="expenseCategory">Categoría</label>
+              <select id="expenseCategory">
+                <option value="hogar">🏠 Hogar</option>
+                <option value="suscripciones">📺 Suscripciones</option>
+                <option value="transporte">🚗 Transporte</option>
+                <option value="comida">🍔 Comida</option>
+                <option value="salud">💊 Salud</option>
+                <option value="ocio">🎮 Ocio</option>
+                <option value="educacion">📚 Educación</option>
+                <option value="seguros">🛡️ Seguros</option>
+                <option value="deudas">💳 Deudas/Créditos</option>
+                <option value="otros">📦 Otros</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Tipo de gasto</label>
+            <div class="segmented" id="expenseTypeSeg">
+              <button type="button" class="seg seg-active" data-type="fixed">Fijo</button>
+              <button type="button" class="seg" data-type="temporary">Temporal</button>
+              <button type="button" class="seg" data-type="variable">Variable</button>
+            </div>
+            <p class="field-hint" id="expenseTypeHint">Se repite cada mes hasta que lo elimines.</p>
+          </div>
+
+          <div class="field" id="expenseDateWrap">
+            <label for="expenseStartDate">Fecha de inicio</label>
+            <input type="date" id="expenseStartDate" />
+            <p class="field-hint">Cuándo empieza a contar este gasto.</p>
+          </div>
+
+          <div class="field" id="expenseEndWrap" style="display:none">
+            <label for="expenseEndDate">Fecha de fin</label>
+            <input type="date" id="expenseEndDate" />
+            <p class="field-hint">Tras esta fecha el gasto deja de contar. Déjalo vacío si es indefinido.</p>
+          </div>
+
+          <div class="field" id="expenseMonthWrap" style="display:none">
+            <label>Mes específico</label>
+            <input type="month" id="expenseMonth" />
+            <p class="field-hint">Para gastos puntuales, como una compra concreta.</p>
+          </div>
+
+          <div class="field">
+            <label for="expenseNotes">Notas (opcional)</label>
+            <textarea id="expenseNotes" rows="2" maxlength="200" placeholder="Cualquier detalle útil…"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" id="btnDeleteExpense" style="display:none;color:#ef4444">Eliminar</button>
+            <button type="submit" class="btn btn-primary btn-grow">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Add/Edit Income -->
+    <div class="modal" id="modalIncome" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet" role="dialog" aria-labelledby="incomeTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="incomeTitle">Nuevo ingreso</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="formIncome" class="form">
+          <input type="hidden" id="incomeId" />
+          <div class="field">
+            <label for="incomeName">Concepto</label>
+            <input type="text" id="incomeName" required maxlength="60" placeholder="Ej. Nómina, Freelance, Venta…" />
+          </div>
+          <div class="field">
+            <label for="incomeAmount">Importe</label>
+            <input type="number" id="incomeAmount" required min="0" step="0.01" inputmode="decimal" placeholder="0,00" />
+          </div>
+
+          <div class="field">
+            <label>Tipo de ingreso</label>
+            <div class="segmented" id="incomeTypeSeg">
+              <button type="button" class="seg seg-active" data-type="recurring">Recurrente</button>
+              <button type="button" class="seg" data-type="extra">Puntual / Extra</button>
+            </div>
+            <p class="field-hint" id="incomeTypeHint">Se repite cada mes hasta que lo elimines.</p>
+          </div>
+
+          <div class="field" id="incomeDateWrap">
+            <label for="incomeStartDate">Fecha de inicio</label>
+            <input type="date" id="incomeStartDate" />
+            <p class="field-hint">Cuándo empieza a contar este ingreso.</p>
+          </div>
+
+          <div class="field" id="incomeEndWrap" style="display:none">
+            <label for="incomeEndDate">Fecha de fin</label>
+            <input type="date" id="incomeEndDate" />
+            <p class="field-hint">Tras esta fecha el ingreso deja de contar.</p>
+          </div>
+
+          <div class="field" id="incomeMonthWrap" style="display:none">
+            <label>Mes específico</label>
+            <input type="month" id="incomeMonth" />
+            <p class="field-hint">Mes concreto en el que se recibe este ingreso.</p>
+          </div>
+
+          <div class="field">
+            <label for="incomeNotes">Notas (opcional)</label>
+            <textarea id="incomeNotes" rows="2" maxlength="200"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" id="btnDeleteIncome" style="display:none;color:#ef4444">Eliminar</button>
+            <button type="submit" class="btn btn-primary btn-grow">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+  </div>
+
+  <input type="file" id="fileImport" accept="application/json,.json" style="display:none" />
+
+  <script src="js/models.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
