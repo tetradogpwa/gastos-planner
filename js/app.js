@@ -150,6 +150,13 @@
       });
     });
 
+    bindAmountHistory({
+      listId: 'expenseAmountHistory',
+      btnId: 'btnAddExpenseAmountChange',
+      amountInputId: 'expenseAmount',
+      dateInputId: 'expenseStartDate'
+    });
+
     // Eliminar
     $('#btnDeleteExpense').addEventListener('click', () => {
       const id = $('#expenseId').value;
@@ -166,6 +173,7 @@
 
   function setupExpenseForm(id) {
     const today = Models.toISODate(new Date());
+    const expenseCfg = { listId: 'expenseAmountHistory' };
     if (id) {
       const item = state.expenses.find((x) => x.id === id);
       if (!item) return;
@@ -178,12 +186,15 @@
       $('#expenseEndDate').value = item.endDate || '';
       $('#expenseMonth').value = item.targetMonth || '';
       $('#expenseNotes').value = item.notes || '';
+      $('#expenseOptional').checked = !!item.optional;
+      $('#expenseOneTime').checked = !!item.oneTime;
       // Seg
       $$('#expenseTypeSeg .seg').forEach((x) => {
         x.classList.toggle('seg-active', x.dataset.type === item.type);
       });
       updateExpenseTypeUI(item.type);
       $('#btnDeleteExpense').style.display = 'inline-flex';
+      loadAmountHistory(expenseCfg, item);
     } else {
       $('#expenseTitle').textContent = 'Nuevo gasto';
       $('#expenseId').value = '';
@@ -194,11 +205,15 @@
       $('#expenseEndDate').value = '';
       $('#expenseMonth').value = currentMonth;
       $('#expenseNotes').value = '';
+      $('#expenseOptional').checked = false;
+      $('#expenseOneTime').checked = false;
       $$('#expenseTypeSeg .seg').forEach((x) => {
         x.classList.toggle('seg-active', x.dataset.type === 'fixed');
       });
       updateExpenseTypeUI('fixed');
       $('#btnDeleteExpense').style.display = 'none';
+      const blankItem = { startDate: $('#expenseStartDate').value || today, amount: 0, amountHistory: [] };
+      loadAmountHistory(expenseCfg, blankItem);
     }
   }
 
@@ -228,15 +243,20 @@
 
   function submitExpenseForm() {
     const type = $('#expenseTypeSeg .seg-active').dataset.type;
+    const amountHistory = readAmountHistory('expenseAmountHistory');
+    const lastAmount = amountHistory.length > 0 ? amountHistory[amountHistory.length - 1].amount : (parseFloat($('#expenseAmount').value) || 0);
     const data = {
       id: $('#expenseId').value || undefined,
       name: $('#expenseName').value.trim(),
-      amount: parseFloat($('#expenseAmount').value),
+      amount: lastAmount,
       type,
       category: $('#expenseCategory').value,
       startDate: $('#expenseStartDate').value || '',
       endDate: $('#expenseEndDate').value || null,
       targetMonth: $('#expenseMonth').value || null,
+      optional: $('#expenseOptional').checked,
+      oneTime: $('#expenseOneTime').checked,
+      amountHistory,
       notes: $('#expenseNotes').value.trim()
     };
 
@@ -285,6 +305,13 @@
       });
     });
 
+    bindAmountHistory({
+      listId: 'incomeAmountHistory',
+      btnId: 'btnAddIncomeAmountChange',
+      amountInputId: 'incomeAmount',
+      dateInputId: 'incomeStartDate'
+    });
+
     $('#btnDeleteIncome').addEventListener('click', () => {
       const id = $('#incomeId').value;
       if (!id) return;
@@ -298,8 +325,110 @@
     });
   }
 
+  // Estado del historial de importes por formulario (se inicializa en setup)
+  const amountHistoryState = {};
+
+  function bindAmountHistory(cfg) {
+    const btnEl = $('#' + cfg.btnId);
+    const amountInput = $('#' + cfg.amountInputId);
+    const dateInput = $('#' + cfg.dateInputId);
+
+    btnEl.addEventListener('click', () => {
+      const h = amountHistoryState[cfg.listId] || (amountHistoryState[cfg.listId] = []);
+      const lastDate = h.length > 0 ? h[h.length - 1].fromDate : (dateInput.value || Models.toISODate(new Date()));
+      const lastAmount = h.length > 0 ? h[h.length - 1].amount : (parseFloat(amountInput.value) || 0);
+      h.push({ fromDate: lastDate, amount: lastAmount });
+      renderAmountHistoryList(cfg.listId);
+      if (h.length > 0 && document.activeElement !== amountInput) {
+        amountInput.value = h[h.length - 1].amount;
+      }
+    });
+
+    // Editar directamente el campo "Importe" → sincronizar la última entrada
+    amountInput.addEventListener('input', () => {
+      const h = amountHistoryState[cfg.listId];
+      if (!h || h.length === 0) return;
+      h[h.length - 1] = { ...h[h.length - 1], amount: parseFloat(amountInput.value) || 0 };
+    });
+  }
+
+  function loadAmountHistory(cfg, item) {
+    let list = Array.isArray(item.amountHistory) ? [...item.amountHistory] : [];
+    if (list.length === 0) {
+      list.push({ fromDate: item.startDate || Models.toISODate(new Date()), amount: Number(item.amount) || 0 });
+    }
+    list.sort((a, b) => (a.fromDate || '').localeCompare(b.fromDate || ''));
+    amountHistoryState[cfg.listId] = list;
+    renderAmountHistoryList(cfg.listId);
+    const amt = $('#' + cfg.amountInputId);
+    if (list.length > 0 && amt) amt.value = list[list.length - 1].amount;
+  }
+
+  function renderAmountHistoryList(listId) {
+    const listEl = $('#' + listId);
+    if (!listEl) return;
+    const history = amountHistoryState[listId] || [];
+    listEl.innerHTML = '';
+    history.forEach((entry, idx) => {
+      const li = document.createElement('li');
+      const dateField = document.createElement('input');
+      dateField.type = 'date';
+      dateField.value = entry.fromDate || '';
+      dateField.addEventListener('change', (e) => {
+        const h = amountHistoryState[listId];
+        h[idx] = { ...h[idx], fromDate: e.target.value };
+        renderAmountHistoryList(listId);
+      });
+      const amtField = document.createElement('input');
+      amtField.type = 'number';
+      amtField.step = '0.01';
+      amtField.min = '0';
+      amtField.inputMode = 'decimal';
+      amtField.value = entry.amount;
+      amtField.addEventListener('input', (e) => {
+        const h = amountHistoryState[listId];
+        h[idx] = { ...h[idx], amount: parseFloat(e.target.value) || 0 };
+      });
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'amount-remove';
+      removeBtn.setAttribute('aria-label', 'Eliminar cambio');
+      removeBtn.textContent = '×';
+      removeBtn.addEventListener('click', () => {
+        const h = amountHistoryState[listId];
+        h.splice(idx, 1);
+        renderAmountHistoryList(listId);
+      });
+      li.appendChild(dateField);
+      li.appendChild(amtField);
+      li.appendChild(removeBtn);
+      if (idx === history.length - 1) {
+        const badge = document.createElement('span');
+        badge.className = 'amount-badge';
+        badge.textContent = 'actual';
+        li.appendChild(badge);
+      }
+      listEl.appendChild(li);
+    });
+  }
+
+  function readAmountHistory(listId) {
+    const list = amountHistoryState[listId] || [];
+    return list
+      .filter((e) => e && e.fromDate && !isNaN(parseFloat(e.amount)))
+      .map((e) => ({ fromDate: e.fromDate, amount: parseFloat(e.amount) || 0 }))
+      .sort((a, b) => a.fromDate.localeCompare(b.fromDate));
+  }
+
   function setupIncomeForm(id) {
     const today = Models.toISODate(new Date());
+    const incomeCfg = {
+      listId: 'incomeAmountHistory',
+      btnId: 'btnAddIncomeAmountChange',
+      amountInputId: 'incomeAmount',
+      dateInputId: 'incomeStartDate',
+      _setHistory: null, _render: null, _getHistory: null
+    };
     if (id) {
       const item = state.income.find((x) => x.id === id);
       if (!item) return;
@@ -307,7 +436,6 @@
       $('#incomeId').value = item.id;
       $('#incomeName').value = item.name;
       $('#incomeAmount').value = item.amount;
-      $('#incomeCategory').value = item.category;
       $('#incomeStartDate').value = item.startDate;
       $('#incomeEndDate').value = item.endDate || '';
       $('#incomeMonth').value = item.targetMonth || '';
@@ -317,12 +445,12 @@
       });
       updateIncomeTypeUI(item.type);
       $('#btnDeleteIncome').style.display = 'inline-flex';
+      loadAmountHistory(incomeCfg, item);
     } else {
       $('#incomeTitle').textContent = 'Nuevo ingreso';
       $('#incomeId').value = '';
       $('#incomeName').value = '';
       $('#incomeAmount').value = '';
-      $('#incomeCategory').value = 'nomina';
       $('#incomeStartDate').value = today;
       $('#incomeEndDate').value = '';
       $('#incomeMonth').value = currentMonth;
@@ -332,6 +460,8 @@
       });
       updateIncomeTypeUI('recurring');
       $('#btnDeleteIncome').style.display = 'none';
+      const blankItem = { startDate: $('#incomeStartDate').value || today, amount: 0, amountHistory: [] };
+      loadAmountHistory(incomeCfg, blankItem);
     }
   }
 
@@ -343,9 +473,9 @@
 
     if (type === 'recurring') {
       startWrap.style.display = 'flex';
-      endWrap.style.display = 'none';
+      endWrap.style.display = 'flex';
       monthWrap.style.display = 'none';
-      hint.textContent = 'Se repite cada mes hasta que lo elimines.';
+      hint.textContent = 'Se repite cada mes. Puedes indicar una fecha de fin para que deje de contar.';
     } else if (type === 'extra') {
       startWrap.style.display = 'none';
       endWrap.style.display = 'none';
@@ -356,20 +486,27 @@
 
   function submitIncomeForm() {
     const type = $('#incomeTypeSeg .seg-active').dataset.type;
+    const amountHistory = readAmountHistory('incomeAmountHistory');
+    const lastAmount = amountHistory.length > 0 ? amountHistory[amountHistory.length - 1].amount : (parseFloat($('#incomeAmount').value) || 0);
     const data = {
       id: $('#incomeId').value || undefined,
       name: $('#incomeName').value.trim(),
-      amount: parseFloat($('#incomeAmount').value),
+      amount: lastAmount,
       type,
-      category: $('#incomeCategory').value,
+      category: state.income.find((x) => x.id === $('#incomeId').value)?.category || 'nomina',
       startDate: $('#incomeStartDate').value || '',
       endDate: $('#incomeEndDate').value || null,
       targetMonth: $('#incomeMonth').value || null,
+      amountHistory,
       notes: $('#incomeNotes').value.trim()
     };
 
     if (!data.name) { toast('Escribe un concepto', 'error'); return; }
     if (!(data.amount >= 0)) { toast('Importe inválido', 'error'); return; }
+    if (data.endDate && data.startDate && data.endDate < data.startDate) {
+      toast('La fecha de fin es anterior a la de inicio', 'error');
+      return;
+    }
     if (data.type === 'extra' && !data.targetMonth) {
       toast('Selecciona el mes del ingreso extra', 'error');
       return;
@@ -522,6 +659,7 @@
   function render() {
     renderHeader();
     renderSummary();
+    renderPendingOptional();
     renderMonthItems();
     if (currentView === 'gastos') renderExpensesList();
     else if (currentView === 'ingresos') renderIncomeList();
@@ -587,6 +725,82 @@
     all.forEach((item) => list.appendChild(buildItemElement(item)));
   }
 
+  function renderPendingOptional() {
+    const section = $('#pendingOptionalSection');
+    const listEl = $('#pendingOptionalList');
+    const countEl = $('#pendingOptionalCount');
+    if (!section || !listEl) return;
+
+    const pending = state.expenses.filter((e) => Models.isPendingOptional(e, currentMonth));
+
+    if (pending.length === 0) {
+      section.style.display = 'none';
+      listEl.innerHTML = '';
+      countEl.textContent = '0';
+      return;
+    }
+
+    section.style.display = '';
+    countEl.textContent = `${pending.length}`;
+    listEl.innerHTML = '';
+    pending.forEach((item) => listEl.appendChild(buildPendingElement(item)));
+  }
+
+  function buildPendingElement(item) {
+    const cat = Models.CATEGORIES[item.category] || Models.CATEGORIES.otros;
+    const amount = Models.effectiveAmountAt(item, currentMonth);
+    const el = document.createElement('div');
+    el.className = 'item item-pending';
+    el.innerHTML = `
+      <div class="item-icon" style="background:var(--bg-soft);color:var(--text-mute)">
+        ${cat.icon}
+      </div>
+      <div class="item-content">
+        <div class="item-name">
+          <span>${escapeHTML(item.name)}</span>
+          <span class="item-tag tag-optional">Opcional</span>
+          ${item.oneTime ? '<span class="item-tag tag-onetime">Pago único</span>' : ''}
+        </div>
+        <div class="item-meta">
+          <span>${cat.label}</span>
+          <span class="dot"></span>
+          <span>${Models.formatMoney(amount, state.settings.currency)}</span>
+        </div>
+      </div>
+      <div class="item-amount is-expense">
+        -${Models.formatMoney(amount, state.settings.currency)}
+      </div>
+      <div class="item-pending-actions">
+        <button class="btn btn-primary btn-small" data-confirm="${item.id}">Confirmar este mes</button>
+        <button class="btn btn-ghost btn-small" data-skip="${item.id}">Saltar</button>
+      </div>
+    `;
+    el.querySelector('[data-confirm]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = e.currentTarget.dataset.confirm;
+      const target = state.expenses.find((x) => x.id === id);
+      if (!target) return;
+      target.paidMonths = Models.togglePaidMonth(target, currentMonth, true);
+      target.skippedMonths = Models.toggleSkippedMonth(target, currentMonth, false);
+      target.updatedAt = new Date().toISOString();
+      Storage.save(state);
+      render();
+      toast(target.oneTime ? 'Pago registrado' : 'Mes confirmado', 'success');
+    });
+    el.querySelector('[data-skip]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = e.currentTarget.dataset.skip;
+      const target = state.expenses.find((x) => x.id === id);
+      if (!target) return;
+      target.skippedMonths = Models.toggleSkippedMonth(target, currentMonth, true);
+      target.updatedAt = new Date().toISOString();
+      Storage.save(state);
+      render();
+      toast('Mes saltado', 'info');
+    });
+    return el;
+  }
+
   function buildItemElement(item) {
     const cat = Models.CATEGORIES[item.category] || Models.CATEGORIES.otros;
     const isExpense = item._kind === 'expense';
@@ -614,7 +828,7 @@
         </div>
       </div>
       <div class="item-amount ${isExpense ? 'is-expense' : 'is-income'}">
-        ${isExpense ? '-' : '+'}${Models.formatMoney(item.amount, state.settings.currency)}
+        ${isExpense ? '-' : '+'}${Models.formatMoney(item.effectiveAmount != null ? item.effectiveAmount : item.amount, state.settings.currency)}
       </div>
       <button class="item-action" data-edit="${item.id}" data-kind="${item._kind}" aria-label="Editar">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>

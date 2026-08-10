@@ -86,6 +86,16 @@
           </button>
         </div>
 
+        <!-- Pending optional expenses -->
+        <div class="section" id="pendingOptionalSection" style="display:none">
+          <div class="section-header">
+            <h2 class="section-title">Pendientes de confirmar</h2>
+            <span class="section-meta" id="pendingOptionalCount">0</span>
+          </div>
+          <p class="section-hint">Estos gastos opcionales pueden aplicarse este mes. Confírmalos si los has pagado.</p>
+          <div class="items-list" id="pendingOptionalList"></div>
+        </div>
+
         <!-- Month items -->
         <div class="section">
           <div class="section-header">
@@ -352,6 +362,31 @@
             <p class="field-hint">Para gastos puntuales, como una compra concreta.</p>
           </div>
 
+          <div class="field field-toggle">
+            <label class="toggle">
+              <input type="checkbox" id="expenseOptional" />
+              <span class="toggle-track"></span>
+              <span class="toggle-text">Es opcional</span>
+            </label>
+            <p class="field-hint">No cuenta hasta que confirmes el mes. Útil para suscripciones que pausas, gastos puntuales o pagos que decides cuándo hacer.</p>
+          </div>
+
+          <div class="field field-toggle">
+            <label class="toggle">
+              <input type="checkbox" id="expenseOneTime" />
+              <span class="toggle-track"></span>
+              <span class="toggle-text">Pago único</span>
+            </label>
+            <p class="field-hint">Solo se paga una vez. Cuando lo confirmes, desaparece de la lista de pendientes.</p>
+          </div>
+
+          <div class="field">
+            <label>Historial de importes</label>
+            <ul class="amount-history" id="expenseAmountHistory"></ul>
+            <button type="button" class="btn btn-ghost btn-small" id="btnAddExpenseAmountChange">+ Añadir cambio de importe</button>
+            <p class="field-hint">Para cambios de precio o cualquier variación a partir de una fecha.</p>
+          </div>
+
           <div class="field">
             <label for="expenseNotes">Notas (opcional)</label>
             <textarea id="expenseNotes" rows="2" maxlength="200" placeholder="Cualquier detalle útil…"></textarea>
@@ -412,6 +447,13 @@
             <label>Mes específico</label>
             <input type="month" id="incomeMonth" />
             <p class="field-hint">Mes concreto en el que se recibe este ingreso.</p>
+          </div>
+
+          <div class="field">
+            <label>Historial de importes</label>
+            <ul class="amount-history" id="incomeAmountHistory"></ul>
+            <button type="button" class="btn btn-ghost btn-small" id="btnAddIncomeAmountChange">+ Añadir cambio de importe</button>
+            <p class="field-hint">Para subidas de sueldo o cualquier cambio de importe a partir de una fecha.</p>
           </div>
 
           <div class="field">

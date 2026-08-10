@@ -112,6 +112,8 @@
 
   // ---------- Normalización ----------
   function normalizeExpense(raw) {
+    const paidMonths = (raw.paidMonths && typeof raw.paidMonths === 'object') ? raw.paidMonths : {};
+    const skippedMonths = (raw.skippedMonths && typeof raw.skippedMonths === 'object') ? raw.skippedMonths : {};
     return {
       id: raw.id || uuid(),
       name: String(raw.name || '').trim(),
@@ -121,6 +123,11 @@
       startDate: raw.startDate || '',
       endDate: raw.endDate || null,
       targetMonth: raw.targetMonth || null, // solo para variable
+      optional: !!raw.optional,
+      oneTime: !!raw.oneTime,
+      paidMonths,
+      skippedMonths,
+      amountHistory: normalizeAmountHistory(raw.amountHistory, raw.startDate, raw.amount),
       notes: String(raw.notes || ''),
       createdAt: raw.createdAt || new Date().toISOString(),
       updatedAt: raw.updatedAt || new Date().toISOString()
@@ -137,10 +144,25 @@
       startDate: raw.startDate || '',
       endDate: raw.endDate || null,
       targetMonth: raw.targetMonth || null, // solo para extra
+      amountHistory: normalizeAmountHistory(raw.amountHistory, raw.startDate, raw.amount),
       notes: String(raw.notes || ''),
       createdAt: raw.createdAt || new Date().toISOString(),
       updatedAt: raw.updatedAt || new Date().toISOString()
     };
+  }
+
+  function normalizeAmountHistory(raw, fallbackStartDate, fallbackAmount) {
+    if (!Array.isArray(raw)) {
+      // Sin historial previo: crear una entrada implícita con startDate y amount
+      if (fallbackStartDate || fallbackAmount) {
+        return [{ fromDate: fallbackStartDate || toISODate(new Date()), amount: Number(fallbackAmount) || 0 }];
+      }
+      return [];
+    }
+    return raw
+      .filter((c) => c && c.fromDate)
+      .map((c) => ({ fromDate: c.fromDate, amount: Number(c.amount) || 0 }))
+      .sort((a, b) => a.fromDate.localeCompare(b.fromDate));
   }
 
   function normalizeSettings(raw) {
@@ -183,14 +205,20 @@
     // Para items recurrentes (fixed, temporary, recurring income)
     // Si no hay startDate, lo consideramos activo desde el mes actual
     if (!item.startDate) {
-      return compareMonthKeys(monthKey, todayMonthKey()) >= 0;
-    }
-    const start = parseISODate(item.startDate);
-    if (start > monthEnd) return false;
+      if (compareMonthKeys(monthKey, todayMonthKey()) < 0) return false;
+    } else {
+      const start = parseISODate(item.startDate);
+      if (start > monthEnd) return false;
 
-    if (item.endDate) {
-      const end = parseISODate(item.endDate);
-      if (end < monthStart) return false;
+      if (item.endDate) {
+        const end = parseISODate(item.endDate);
+        if (end < monthStart) return false;
+      }
+    }
+
+    // Gastos opcionales: solo cuentan los meses confirmados explícitamente
+    if (item.optional) {
+      return !!(item.paidMonths && item.paidMonths[monthKey]);
     }
 
     return true;
@@ -204,12 +232,12 @@
   function getItemsForMonth(state, monthKey) {
     const expenses = state.expenses
       .filter((e) => appliesToMonth(e, monthKey))
-      .map((e) => ({ ...e, _kind: 'expense' }))
+      .map((e) => ({ ...e, _kind: 'expense', effectiveAmount: effectiveAmountAt(e, monthKey) }))
       .sort(sortItem);
 
     const income = state.income
       .filter((i) => appliesToMonth(i, monthKey))
-      .map((i) => ({ ...i, _kind: 'income' }))
+      .map((i) => ({ ...i, _kind: 'income', effectiveAmount: effectiveAmountAt(i, monthKey) }))
       .sort(sortItem);
 
     return { expenses, income, all: [...expenses, ...income] };
@@ -226,8 +254,8 @@
 
   function summarize(state, monthKey) {
     const { expenses, income } = getItemsForMonth(state, monthKey);
-    const totalExp = expenses.reduce((s, x) => s + x.amount, 0);
-    const totalInc = income.reduce((s, x) => s + x.amount, 0);
+    const totalExp = expenses.reduce((s, x) => s + (x.effectiveAmount || 0), 0);
+    const totalInc = income.reduce((s, x) => s + (x.effectiveAmount || 0), 0);
     return {
       totalExpenses: totalExp,
       totalIncome: totalInc,
@@ -357,6 +385,72 @@
     return diffDays >= 0 && diffDays <= 31;
   }
 
+  /**
+   * Devuelve true si el item es opcional pero no está confirmado para el mes monthKey
+   * (está dentro de su rango, pero pendiente de que el usuario lo marque como pagado).
+   */
+  function isPendingOptional(item, monthKey) {
+    if (!item || !item.optional) return false;
+    // Pago único: si ya se pagó alguna vez, ya está hecho y nunca más vuelve a salir como pendiente
+    if (item.oneTime && item.paidMonths && Object.keys(item.paidMonths).length > 0) return false;
+    if (item.paidMonths && item.paidMonths[monthKey]) return false;
+    if (item.skippedMonths && item.skippedMonths[monthKey]) return false;
+    // ¿Entraría en este mes si NO fuera opcional? Si ya no aplica por rango, no es "pendiente"
+    return wouldApplyIfMandatory(item, monthKey);
+  }
+
+  function wouldApplyIfMandatory(item, monthKey) {
+    const monthStart = firstOfMonth(monthKey);
+    const monthEnd = lastOfMonth(monthKey);
+    if (item.type === 'variable' || item.type === 'extra') {
+      return item.targetMonth === monthKey;
+    }
+    if (!item.startDate) {
+      return compareMonthKeys(monthKey, todayMonthKey()) >= 0;
+    }
+    const start = parseISODate(item.startDate);
+    if (start > monthEnd) return false;
+    if (item.endDate) {
+      const end = parseISODate(item.endDate);
+      if (end < monthStart) return false;
+    }
+    return true;
+  }
+
+  function togglePaidMonth(item, monthKey, paid) {
+    const months = { ...(item.paidMonths || {}) };
+    if (paid) months[monthKey] = true;
+    else delete months[monthKey];
+    return months;
+  }
+
+  function toggleSkippedMonth(item, monthKey, skipped) {
+    const months = { ...(item.skippedMonths || {}) };
+    if (skipped) months[monthKey] = true;
+    else delete months[monthKey];
+    return months;
+  }
+
+  /**
+   * Devuelve el importe que aplicaba al mes monthKey según el historial.
+   * Si no hay historial, devuelve item.amount.
+   */
+  function effectiveAmountAt(item, monthKey) {
+    const history = Array.isArray(item.amountHistory) ? item.amountHistory : [];
+    if (history.length === 0) return Number(item.amount) || 0;
+    const monthStart = firstOfMonth(monthKey);
+    let result = Number(item.amount) || 0;
+    for (const ch of history) {
+      const chDate = parseISODate(ch.fromDate);
+      if (chDate && chDate <= monthStart) {
+        result = Number(ch.amount) || 0;
+      } else {
+        break;
+      }
+    }
+    return result;
+  }
+
   // ---------- Formato de moneda ----------
   /**
    * Formato manual para evitar depender de ICU completo del navegador.
@@ -414,6 +508,10 @@
     monthsForItem,
     validityText,
     isEndingSoon,
+    isPendingOptional,
+    togglePaidMonth,
+    toggleSkippedMonth,
+    effectiveAmountAt,
     uuid
   };
 })(window);
