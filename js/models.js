@@ -506,7 +506,8 @@
       Object.keys(e.pendingMonths).forEach((mk) => {
         if (!e.pendingMonths[mk]) return;
         if (e.paidMonths && e.paidMonths[mk]) return;
-        if (mk !== monthKey) return;
+        // Mostrar solo pendientes del mes actual o anteriores (no futuros)
+        if (mk > monthKey) return;
         if (!wouldApplyIfMandatory(e, mk)) return;
         out.push({
           item: e,
