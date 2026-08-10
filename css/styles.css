@@ -1352,33 +1352,69 @@ textarea { resize: vertical; min-height: 60px; }
 
 /* ============================================
    Summary grid responsive (5 cards)
+   Distribución:
+     - Fila 1: Ingresos, Gastos, Balance
+     - Fila 2: Retenido, Libre (centrados)
    ============================================ */
 
-/* Móvil (< 600px): 2 cols, Balance ocupa fila completa */
+/* Móvil (< 600px): 2 cols, Balance fila completa, Retenido/Libre en fila 3 */
 .summary-grid {
   grid-template-columns: 1fr 1fr;
+}
+.summary-card.summary-income,
+.summary-card.summary-expense,
+.summary-card.summary-balance {
+  justify-self: center;
 }
 .summary-card.summary-balance {
   grid-column: span 2;
 }
+.summary-card.summary-budget,
+.summary-card.summary-free {
+  justify-self: center;
+}
 
-/* Tablet (600-899px): 3 cols, Balance span 2 al lado de Libre */
+/* Tablet (600-899px): 3 cols, Balance span 2, Retenido/Libre centrados en fila 2 */
 @media (min-width: 600px) {
   .summary-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+  .summary-card.summary-income,
+  .summary-card.summary-expense,
+  .summary-card.summary-balance {
+    justify-self: center;
+  }
   .summary-card.summary-balance {
     grid-column: span 2;
   }
+  .summary-card.summary-budget {
+    grid-column: 1;
+    justify-self: center;
+  }
+  .summary-card.summary-free {
+    grid-column: 2;
+    justify-self: center;
+  }
 }
 
-/* Desktop (≥ 900px): las 5 en una fila */
+/* Desktop (≥ 900px): 5 cols, fila 1 (Ingresos/Gastos/Balance) centrada en bloque,
+   fila 2 (Retenido/Libre) centrada en bloque */
 @media (min-width: 900px) {
   .summary-grid {
     grid-template-columns: repeat(5, 1fr);
+    justify-content: center;
+  }
+  .summary-card.summary-income {
+    grid-column: 2;
   }
   .summary-card.summary-balance {
-    grid-column: span 1;
+    grid-column: 4;
+  }
+  .summary-card.summary-budget {
+    grid-column: 2;
+  }
+  .summary-card.summary-free {
+    grid-column: 3;
   }
 }
 
@@ -1749,3 +1785,357 @@ body.modal-open-body { overflow: hidden; }
   color: var(--text-mute);
   margin-top: 2px;
 }
+
+/* ============================================
+   Tarjetas de crédito (revolving)
+   ============================================ */
+.cc-item {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.cc-item.cc-item--inactive {
+  opacity: 0.6;
+}
+
+.cc-item-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cc-item-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cc-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-item-name {
+  font-weight: 700;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-item-meta {
+  font-size: 12px;
+  color: var(--text-mute);
+}
+
+.cc-item-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.cc-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  overflow: hidden;
+  position: relative;
+}
+
+.cc-bar-fill {
+  height: 100%;
+  background: var(--danger);
+  transition: width .3s ease;
+}
+
+.cc-bar-fill--ok {
+  background: var(--success);
+}
+
+.cc-bar-fill--warn {
+  background: var(--warning);
+}
+
+.cc-numbers {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-mute);
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cc-numbers strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.cc-numbers strong.cc-numbers--danger {
+  color: var(--danger);
+}
+
+.cc-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cc-row-actions .btn {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+.cc-monthly {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-soft);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.cc-monthly-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.cc-monthly-status--paid {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.cc-monthly-status--skipped {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.cc-monthly-status--pending {
+  background: var(--bg-elev);
+  color: var(--text-mute);
+}
+
+/* ============================================
+   Timeline detallado (Histórico)
+   ============================================ */
+.timeline-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.timeline-head .timeline-month {
+  flex: 1;
+  min-width: 0;
+}
+.timeline-details {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.timeline-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+}
+.timeline-detail-row.is-virtual {
+  opacity: 0.85;
+  font-style: italic;
+}
+.timeline-detail-icon {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.timeline-detail-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.timeline-detail-amount {
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.timeline-detail-amount.is-expense {
+  color: var(--danger);
+}
+.timeline-detail-amount.is-income {
+  color: var(--success);
+}
+
+/* ============================================
+   Items virtuales (cuota de tarjeta en Detalle del mes)
+   ============================================ */
+.item-virtual {
+  opacity: 0.85;
+  background: color-mix(in srgb, var(--warning) 4%, var(--bg-elev));
+  border-left: 3px solid var(--warning);
+  cursor: default;
+}
+.item-virtual .item-name {
+  font-style: italic;
+}
+.item-tag.tag-virtual {
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-style: italic;
+}
+
+/* ============================================
+   About box y footer
+   ============================================ */
+.about-box {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.app-brand-icon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, .3);
+  flex-shrink: 0;
+}
+.app-brand-info { display: flex; flex-direction: column; gap: 2px; }
+.app-brand-name { font-weight: 700; font-size: 17px; color: var(--text); }
+.app-brand-version {
+  font-size: 11px;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 600;
+}
+.app-brand-desc {
+  font-size: 12px;
+  color: var(--text-mute);
+  margin: 0;
+  line-height: 1.5;
+}
+.powered-by {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-soft);
+  text-decoration: none;
+  align-self: flex-start;
+  transition: all .2s ease;
+  font-weight: 500;
+}
+.powered-by:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, .12), rgba(139, 92, 246, .12));
+  border-color: rgba(99, 102, 241, .4);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+.powered-by strong {
+  font-weight: 800;
+  font-size: 13px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.01em;
+}
+.powered-by svg {
+  opacity: 0.6;
+  transition: opacity .2s, transform .2s;
+}
+.powered-by:hover svg { opacity: 1; transform: translate(1px, -1px); }
+
+.app-footer {
+  padding: 12px 16px 16px;
+  text-align: center;
+  padding-bottom: calc(var(--nav-h) + var(--safe-bot) + 16px);
+}
+.app-footer-link {
+  font-size: 11px;
+  color: var(--text-mute);
+  text-decoration: none;
+  letter-spacing: .02em;
+  transition: color .2s;
+}
+.app-footer-link:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+/* ============================================
+   Saldo de cuenta (DESHABILITADO)
+   ============================================ */
+/*
+.balance-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, .08), rgba(139, 92, 246, .08));
+  border: 1px solid rgba(99, 102, 241, .25);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.balance-amount {
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.balance-info {
+  font-size: 12px;
+  color: var(--text-mute);
+}
+*/

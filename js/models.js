@@ -130,6 +130,8 @@
       category: CATEGORIES[raw.category] ? raw.category : 'otros',
       subcategoryId: raw.subcategoryId || null,
       budgetId: raw.budgetId || null,
+      creditCardId: raw.creditCardId || null,
+      isExtraPayment: !!raw.isExtraPayment,
       startDate: raw.startDate || '',
       endDate: raw.endDate || null,
       targetMonth: raw.targetMonth || null,
@@ -191,6 +193,30 @@
     };
   }
 
+  function normalizeCreditCard(raw) {
+    const paidMonths = (raw.paidMonths && typeof raw.paidMonths === 'object') ? raw.paidMonths : {};
+    const skippedMonths = (raw.skippedMonths && typeof raw.skippedMonths === 'object') ? raw.skippedMonths : {};
+    return {
+      id: raw.id || uuid(),
+      name: String(raw.name || '').trim(),
+      maxLimit: Number(raw.maxLimit) || 0,
+      currentBalance: Number(raw.currentBalance) || 0,
+      monthlyPayment: Number(raw.monthlyPayment) || 0,
+      purchaseAmount: Number(raw.purchaseAmount) || 0,
+      installments: Number(raw.installments) || 0,
+      installmentStartMonth: raw.installmentStartMonth || null,
+      startDate: raw.startDate || '',
+      category: CATEGORIES[raw.category] ? raw.category : 'deudas',
+      paidMonths,
+      skippedMonths,
+      inactive: !!raw.inactive,
+      icon: raw.icon || '💳',
+      notes: String(raw.notes || ''),
+      createdAt: raw.createdAt || new Date().toISOString(),
+      updatedAt: raw.updatedAt || new Date().toISOString()
+    };
+  }
+
   function normalizeAmountHistory(raw, fallbackStartDate, fallbackAmount) {
     if (!Array.isArray(raw)) {
       if (fallbackStartDate || fallbackAmount) {
@@ -221,9 +247,29 @@
       income: [],
       budgets: [],
       subcategories: [],
+      creditCards: [],
+      // balanceEntries: [],
       settings: normalizeSettings({})
     };
   }
+
+  // function normalizeBalanceEntry(raw) {
+  //   return {
+  //     id: raw.id || uuid(),
+  //     monthKey: raw.monthKey || todayMonthKey(),
+  //     balance: Number(raw.balance) || 0,
+  //     date: raw.date || new Date().toISOString()
+  //   };
+  // }
+
+  // function getLatestBalance(state, monthKey) {
+  //   if (!state.balanceEntries || state.balanceEntries.length === 0) return null;
+  //   const entries = monthKey
+  //     ? state.balanceEntries.filter((b) => b.monthKey === monthKey)
+  //     : state.balanceEntries;
+  //   if (entries.length === 0) return null;
+  //   return entries[entries.length - 1];
+  // }
 
   // ---------- Reglas de proyección ----------
   function appliesToMonth(item, monthKey) {
@@ -309,8 +355,21 @@
 
   function summarize(state, monthKey) {
     const { expenses, income } = getItemsForMonth(state, monthKey);
-    const totalExp = expenses.reduce((s, x) => s + (x.effectiveAmount || 0), 0);
     const totalInc = income.reduce((s, x) => s + (x.effectiveAmount || 0), 0);
+    // Gastos SIN presupuesto asignado cuentan en el balance.
+    // Los gastos CON presupuesto se trackean aparte en el progreso del presupuesto.
+    // Las compras con tarjeta de crédito NO cuentan (las paga la tarjeta).
+    // Los pagos extra a tarjeta SÍ cuentan (son salidas de caja reales).
+    const nonBudgetExp = expenses
+      .filter((e) => !e.budgetId && !(e.creditCardId && !e.isExtraPayment))
+      .reduce((s, x) => s + (x.effectiveAmount || 0), 0);
+    // Los presupuestos cuentan como gasto fijo en el balance.
+    const budgetTotal = summarizeBudgets(state, monthKey).totalAssigned;
+    // Las cuotas mensuales de tarjetas revolving cuentan como compromiso recurrente.
+    const ccMonthly = state.creditCards
+      .filter((c) => !c.inactive && appliesCreditCardToMonth(c, monthKey))
+      .reduce((s, c) => s + c.monthlyPayment, 0);
+    const totalExp = nonBudgetExp + budgetTotal + ccMonthly;
     return {
       totalExpenses: totalExp,
       totalIncome: totalInc,
@@ -627,6 +686,61 @@
     return { totalAssigned, totalSpent, totalFree, count: progress.length };
   }
 
+  // ---------- Tarjetas de crédito revolving ----------
+  function appliesCreditCardToMonth(card, monthKey) {
+    if (card.inactive) return false;
+    const monthStart = firstOfMonth(monthKey);
+    const monthEnd = lastOfMonth(monthKey);
+    if (card.startDate) {
+      const start = parseISODate(card.startDate);
+      if (start > monthEnd) return false;
+    }
+    if (card.installmentStartMonth && monthKey < card.installmentStartMonth) return false;
+    if (card.installments > 0 && card.installmentStartMonth) {
+      const endMonth = addMonths(card.installmentStartMonth, card.installments - 1);
+      if (monthKey > endMonth) return false;
+    }
+    return true;
+  }
+
+  function getCreditCardsForMonth(state, monthKey) {
+    return state.creditCards
+      .filter((c) => appliesCreditCardToMonth(c, monthKey))
+      .map((c) => ({
+        ...c,
+        availableCredit: Math.max(0, c.maxLimit - c.currentBalance),
+        effectiveIcon: c.icon || '💳'
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function getCreditCardProgress(state, cardId, monthKey) {
+    const card = state.creditCards.find((c) => c.id === cardId);
+    if (!card) return null;
+    const isPaid = !!(card.paidMonths && card.paidMonths[monthKey]);
+    const isSkipped = !!(card.skippedMonths && card.skippedMonths[monthKey]);
+    return {
+      card,
+      isPaid,
+      isSkipped,
+      isActive: appliesCreditCardToMonth(card, monthKey),
+      availableCredit: Math.max(0, card.maxLimit - card.currentBalance)
+    };
+  }
+
+  function summarizeCreditCards(state) {
+    const active = state.creditCards.filter((c) => !c.inactive);
+    const totalLimit = active.reduce((s, c) => s + c.maxLimit, 0);
+    const totalBalance = active.reduce((s, c) => s + c.currentBalance, 0);
+    const totalAvailable = Math.max(0, totalLimit - totalBalance);
+    return {
+      count: active.length,
+      totalLimit,
+      totalBalance,
+      totalAvailable
+    };
+  }
+
   /**
    * Busca presupuestos existentes para la misma categoría que se solapen en fechas.
    * Sirve para detectar conflictos en la conversión.
@@ -719,6 +833,13 @@
     getBudgetProgress,
     summarizeBudgets,
     findConflictingBudget,
+    normalizeCreditCard,
+    appliesCreditCardToMonth,
+    getCreditCardsForMonth,
+    getCreditCardProgress,
+    summarizeCreditCards,
+    // normalizeBalanceEntry,
+    // getLatestBalance,
     uuid
   };
 })(window);

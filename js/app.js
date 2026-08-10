@@ -7,6 +7,7 @@
 
   const M = window.Models;
   const S = window.Storage;
+  const A = window.Actions;
 
   // ---------- Estado ----------
   let state = S.load();
@@ -230,6 +231,24 @@
       });
   }
 
+  function fillCreditCardSelect(select, selectedId = '') {
+    select.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = '— Sin tarjeta —';
+    select.appendChild(none);
+    state.creditCards
+      .filter((c) => !c.inactive)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.icon || '💳'} ${c.name} (deuda ${fmt(c.currentBalance)} / ${fmt(c.maxLimit)})`;
+        if (c.id === selectedId) opt.selected = true;
+        select.appendChild(opt);
+      });
+  }
+
   function autoSelectSubcategoryForCategory(categoryKey, prevSelected) {
     if (prevSelected) return;
     const subSel = $('#expenseSubcategory');
@@ -362,6 +381,7 @@
       $('#expenseSubcategory').dataset.selected = item.subcategoryId || '';
       fillSubcategorySelect($('#expenseSubcategory'), item.category, item.subcategoryId || '');
       fillBudgetSelect($('#expenseBudget'), item.budgetId || '');
+      fillCreditCardSelect($('#expenseCreditCard'), item.creditCardId || '');
       const itemType = ['fixed', 'temporary', 'unico'].includes(item.type) ? item.type : 'fixed';
       setExpenseType(itemType);
       $('#expenseStartDate').value = item.startDate || M.toISODate(new Date());
@@ -380,6 +400,7 @@
       $('#expenseInactive').checked = false;
       $('#expenseMonth').value = currentMonth;
       fillBudgetSelect($('#expenseBudget'), '');
+      fillCreditCardSelect($('#expenseCreditCard'), '');
       renderAmountHistory('expense', []);
     }
     openModal('modalExpense');
@@ -459,6 +480,7 @@
     const category = $('#expenseCategory').value;
     const subcategoryId = $('#expenseSubcategory').value || null;
     const budgetId = $('#expenseBudget').value || null;
+    const creditCardId = $('#expenseCreditCard').value || null;
     const startDate = $('#expenseStartDate').value;
     const endDate = $('#expenseEndDate').value || null;
     const optional = $('#expenseOptional').checked;
@@ -478,7 +500,7 @@
     });
 
     const payload = {
-      name, amount, type, category, subcategoryId, budgetId, startDate, endDate, optional, inactive, notes,
+      name, amount, type, category, subcategoryId, budgetId, creditCardId, startDate, endDate, optional, inactive, notes,
       targetMonth,
       amountHistory: history
     };
@@ -808,6 +830,7 @@
     persist();
     closeModal('modalSubcategory');
     render();
+    renderSubcategoriesView();
   }
 
   function deleteSubcategory(id) {
@@ -826,6 +849,7 @@
     closeModal('modalSubcategory');
     toast('Subcategoría eliminada');
     render();
+    renderSubcategoriesView();
   }
 
   // ---------- Render: items (líneas) ----------
@@ -835,8 +859,9 @@
     const icon = item.effectiveIcon || cat.icon;
     const tag = isExpense ? M.EXPENSE_TYPES[item.type] : M.INCOME_TYPES[item.type];
     const tagClass = item.type;
+    const isVirtual = !!item.isVirtual;
 
-    const wrap = el('div', { class: 'item item-' + item._kind });
+    const wrap = el('div', { class: 'item item-' + item._kind + (isVirtual ? ' item-virtual' : '') });
 
     const main = el('div', { class: 'item-main' },
       el('div', { class: 'item-icon' }, icon),
@@ -845,6 +870,7 @@
           el('span', { class: 'item-name' }, item.name),
           (tag ? el('span', { class: 'item-tag tag-' + tagClass }, tag.tag) : null),
           (item.optional ? el('span', { class: 'item-tag tag-optional' }, 'Opcional') : null),
+          (isVirtual ? el('span', { class: 'item-tag tag-virtual' }, 'Compromiso') : null),
           (item.skippedMonths && item.skippedMonths[currentMonth] ? el('span', { class: 'item-tag tag-skipped' }, 'Saltado') : null)
         ),
         el('div', { class: 'item-line2' },
@@ -853,7 +879,9 @@
             const sub = M.getSubcategory(state, item.subcategoryId);
             return sub ? el('span', { class: 'item-subcategory' }, ` · ${sub.icon} ${sub.label}`) : null;
           })() : null),
-          el('span', { class: 'item-validity' }, ' · ' + M.validityText(item))
+          isVirtual
+            ? el('span', { class: 'item-validity' }, ' · Compromiso recurrente (cuota de tarjeta)')
+            : el('span', { class: 'item-validity' }, ' · ' + M.validityText(item))
         )
       )
     );
@@ -863,7 +891,7 @@
     const amount = el('div', { class: 'item-amount' }, fmt(item.effectiveAmount));
     right.appendChild(amount);
 
-    if (item.optional) {
+    if (!isVirtual && item.optional) {
       const isPaid = !!(item.paidMonths && item.paidMonths[currentMonth]);
       const isSkipped = !!(item.skippedMonths && item.skippedMonths[currentMonth]);
       const actions = el('div', { class: 'item-actions-row' });
@@ -897,11 +925,12 @@
     wrap.appendChild(right);
 
     wrap.addEventListener('click', () => {
+      if (isVirtual) return;
       if (isExpense) openExpenseForm(item.id);
       else openIncomeForm(item.id);
     });
 
-    if (isExpense && (item.type === 'fixed' || item.type === 'temporary')) {
+    if (!isVirtual && isExpense && (item.type === 'fixed' || item.type === 'temporary')) {
       const isPending = !!(item.pendingMonths && item.pendingMonths[currentMonth]);
       const pendingBtn = el('button', {
         type: 'button',
@@ -925,76 +954,36 @@
   }
 
   function togglePaid(item, monthKey) {
-    const original = state.expenses.find((e) => e.id === item.id);
-    if (!original) return;
-    original.paidMonths = M.togglePaidMonth(original, monthKey, !(original.paidMonths && original.paidMonths[monthKey]));
-    original.updatedAt = new Date().toISOString();
+    state = A.togglePaid(state, item.id, monthKey);
     persist();
     render();
   }
 
   function toggleSkipped(item, monthKey) {
-    const original = state.expenses.find((e) => e.id === item.id);
-    if (!original) return;
-    original.skippedMonths = M.toggleSkippedMonth(original, monthKey, !(original.skippedMonths && original.skippedMonths[monthKey]));
-    original.updatedAt = new Date().toISOString();
+    state = A.toggleSkipped(state, item.id, monthKey);
     persist();
     render();
   }
 
   function togglePendingMandatory(item, monthKey) {
-    const original = state.expenses.find((e) => e.id === item.id);
-    if (!original) return;
-    const wasPending = !!(original.pendingMonths && original.pendingMonths[monthKey]);
-    original.pendingMonths = M.togglePendingMonth(original, monthKey, !wasPending);
-    if (!wasPending) {
-      // Si se marca como pendiente, quitar de paidMonths
-      if (original.paidMonths && original.paidMonths[monthKey]) {
-        const pm = { ...original.paidMonths };
-        delete pm[monthKey];
-        original.paidMonths = pm;
-      }
-    }
-    original.updatedAt = new Date().toISOString();
+    const wasPending = !!(item.pendingMonths && item.pendingMonths[monthKey]);
+    state = A.togglePendingMandatory(state, item.id, monthKey);
     persist();
     render();
     toast(wasPending ? 'Pendiente anulado' : 'Marcado como pendiente (deuda)');
   }
 
   function toggleInactive(itemId) {
-    const original = state.expenses.find((e) => e.id === itemId);
-    if (!original) return;
-    original.inactive = !original.inactive;
-    original.updatedAt = new Date().toISOString();
+    const item = state.expenses.find((e) => e.id === itemId);
+    if (!item) return;
+    state = A.toggleInactive(state, itemId);
     persist();
     render();
-    toast(original.inactive ? 'Gasto desactivado' : 'Gasto reactivado');
+    toast(item.inactive ? 'Gasto reactivado' : 'Gasto desactivado');
   }
 
   function payPendingDebt(itemId, monthKey) {
-    const original = state.expenses.find((e) => e.id === itemId);
-    if (!original) return;
-    const amount = M.effectiveAmountAt(original, monthKey);
-    const pm = { ...(original.paidMonths || {}) };
-    pm[monthKey] = true;
-    original.paidMonths = pm;
-    const pd = { ...(original.pendingMonths || {}) };
-    delete pd[monthKey];
-    original.pendingMonths = pd;
-    // Crear gasto de "pago de deuda" en el mes actual
-    const catchUp = M.normalizeExpense({
-      name: original.name + ' (pago de ' + M.monthKeyToShort(monthKey) + ')',
-      amount,
-      type: 'variable',
-      category: original.category,
-      subcategoryId: original.subcategoryId,
-      budgetId: original.budgetId,
-      targetMonth: currentMonth,
-      startDate: M.toISODate(new Date()),
-      notes: 'Liquidación de deuda pendiente'
-    });
-    state.expenses.push(catchUp);
-    original.updatedAt = new Date().toISOString();
+    state = A.payPendingDebt(state, itemId, monthKey, currentMonth);
     persist();
     render();
     toast('Pago realizado');
@@ -1072,13 +1061,50 @@
   // ---------- Render: histórico ----------
   function buildTimelineElement(entry) {
     const balanceClass = entry.summary.balance >= 0 ? 'positive' : 'negative';
+    const items = M.getItemsForMonth(state, entry.monthKey);
+
+    // Compromisos de tarjetas revolving (cuota mensual como "gasto virtual")
+    const ccItems = state.creditCards
+      .filter((c) => !c.inactive && M.appliesCreditCardToMonth(c, entry.monthKey))
+      .map((c) => ({
+        _kind: 'expense',
+        name: c.name + ' · Cuota',
+        amount: c.monthlyPayment,
+        effectiveAmount: c.monthlyPayment,
+        effectiveIcon: c.icon || '💳',
+        category: c.category,
+        isVirtual: true
+      }));
+
+    const allItems = [...items.all, ...ccItems].sort((a, b) => a.name.localeCompare(b.name));
+
+    const detailRows = allItems.length > 0
+      ? el('div', { class: 'timeline-details' },
+          allItems.map((it) => {
+            const isExp = it._kind === 'expense';
+            return el('div', { class: 'timeline-detail-row' + (it.isVirtual ? ' is-virtual' : '') },
+              el('span', { class: 'timeline-detail-icon' }, it.effectiveIcon || (isExp ? '💸' : '💰')),
+              el('span', { class: 'timeline-detail-name' },
+                it.name,
+                it.isVirtual ? el('span', { class: 'item-tag' }, 'Compromiso') : null
+              ),
+              el('span', { class: 'timeline-detail-amount ' + (isExp ? 'is-expense' : 'is-income') },
+                (isExp ? '-' : '+') + fmt(it.effectiveAmount || 0))
+            );
+          })
+        )
+      : null;
+
     return el('div', { class: 'timeline-item' },
-      el('div', { class: 'timeline-month' }, M.monthKeyToShort(entry.monthKey)),
-      el('div', { class: 'timeline-numbers' },
-        el('span', { class: 'timeline-income' }, '+' + fmt(entry.summary.totalIncome)),
-        el('span', { class: 'timeline-expense' }, '-' + fmt(entry.summary.totalExpenses)),
-        el('span', { class: 'timeline-balance ' + balanceClass }, fmt(entry.summary.balance))
-      )
+      el('div', { class: 'timeline-head' },
+        el('div', { class: 'timeline-month' }, M.monthKeyToShort(entry.monthKey)),
+        el('div', { class: 'timeline-numbers' },
+          el('span', { class: 'timeline-income' }, '+' + fmt(entry.summary.totalIncome)),
+          el('span', { class: 'timeline-expense' }, '-' + fmt(entry.summary.totalExpenses)),
+          el('span', { class: 'timeline-balance ' + balanceClass }, fmt(entry.summary.balance))
+        )
+      ),
+      detailRows
     );
   }
 
@@ -1093,6 +1119,8 @@
     renderAllIncome();
     renderTimeline();
     renderInactiveExpenses();
+    renderCreditCardsView();
+    // renderBalanceSection(); // DESHABILITADO
   }
 
   function renderSummary() {
@@ -1106,7 +1134,7 @@
     balCard.classList.toggle('summary-balance-positive', sum.balance >= 0);
     $('#sumBudget').textContent = fmt(bsum.totalAssigned);
     const remainingBudget = bsum.totalAssigned - bsum.totalSpent;
-    const free = sum.balance - remainingBudget;
+    const free = remainingBudget;
     $('#sumFree').textContent = fmt(free);
     const freeCard = $('#freeCard');
     freeCard.classList.toggle('summary-free-negative', free < 0);
@@ -1186,7 +1214,23 @@
     const list = $('#monthItemsList');
     list.innerHTML = '';
     const { all } = M.getItemsForMonth(state, currentMonth);
-    if (all.length === 0) {
+    // Compromisos de tarjetas revolving (cuota mensual virtual)
+    const ccVirtual = state.creditCards
+      .filter((c) => !c.inactive && M.appliesCreditCardToMonth(c, currentMonth))
+      .map((c) => ({
+        _kind: 'expense',
+        id: 'cc-virtual-' + c.id,
+        name: c.name + ' · Cuota',
+        amount: c.monthlyPayment,
+        effectiveAmount: c.monthlyPayment,
+        type: 'fixed',
+        category: c.category,
+        isVirtual: true,
+        effectiveIcon: c.icon || '💳',
+        startDate: currentMonth + '-01'
+      }));
+    const allItems = [...all, ...ccVirtual];
+    if (allItems.length === 0) {
       list.appendChild(el('div', { class: 'empty-state' },
         el('div', { class: 'empty-icon' }, '📋'),
         el('p', {}, 'No hay movimientos para este mes.'),
@@ -1195,8 +1239,8 @@
       $('#monthItemCount').textContent = '0 movimientos';
       return;
     }
-    all.forEach((item) => list.appendChild(buildItemElement(item)));
-    $('#monthItemCount').textContent = all.length + (all.length === 1 ? ' movimiento' : ' movimientos');
+    allItems.forEach((item) => list.appendChild(buildItemElement(item)));
+    $('#monthItemCount').textContent = allItems.length + (allItems.length === 1 ? ' movimiento' : ' movimientos');
   }
 
   function renderAllExpenses() {
@@ -1300,6 +1344,281 @@
       list.appendChild(wrap);
     });
   }
+
+  // ---------- Tarjetas de crédito ----------
+  function buildCreditCardElement(card) {
+    const isPaid = !!(card.paidMonths && card.paidMonths[currentMonth]);
+    const isSkipped = !!(card.skippedMonths && card.skippedMonths[currentMonth]);
+    const pct = card.maxLimit > 0 ? Math.round((card.currentBalance / card.maxLimit) * 100) : 0;
+    const available = Math.max(0, card.maxLimit - card.currentBalance);
+    const fillClass = pct < 70 ? 'cc-bar-fill--ok' : pct < 90 ? 'cc-bar-fill--warn' : '';
+    const statusClass = isPaid ? 'cc-monthly-status--paid' : isSkipped ? 'cc-monthly-status--skipped' : 'cc-monthly-status--pending';
+    const statusLabel = isPaid ? 'Pagado' : isSkipped ? 'Saltado' : 'Pendiente';
+
+    const wrap = el('div', { class: 'cc-item' + (card.inactive ? ' cc-item--inactive' : '') },
+      el('div', { class: 'cc-item-head' },
+        el('div', { class: 'cc-item-icon' }, card.icon || '💳'),
+        el('div', { class: 'cc-item-body' },
+          el('div', { class: 'cc-item-name' }, card.name),
+          el('div', { class: 'cc-item-meta' }, card.category === 'deudas' ? 'Tarjeta de crédito' : M.CATEGORIES[card.category].label)
+        ),
+        el('div', { class: 'cc-item-actions' },
+          el('button', {
+            type: 'button',
+            'aria-label': 'Editar',
+            title: 'Editar',
+            onClick: (e) => { e.stopPropagation(); openCreditCardForm(card.id); }
+          }, '✏️'),
+          el('button', {
+            type: 'button',
+            'aria-label': card.inactive ? 'Reactivar' : 'Desactivar',
+            title: card.inactive ? 'Reactivar' : 'Desactivar',
+            onClick: (e) => { e.stopPropagation(); toggleCreditCard(card.id); }
+          }, card.inactive ? '🔓' : '🔒')
+        )
+      ),
+      el('div', { class: 'cc-numbers' },
+        el('span', {}, el('strong', {}, fmt(card.currentBalance)), ' de ', el('strong', {}, fmt(card.maxLimit)), ' usado'),
+        el('span', {}, 'Disponible: ', el('strong', { class: pct > 90 ? 'cc-numbers--danger' : '' }, fmt(available)))
+      ),
+      el('div', { class: 'cc-bar' },
+        el('div', { class: 'cc-bar-fill ' + fillClass, style: { width: Math.min(100, pct) + '%' } })
+      ),
+      el('div', { class: 'cc-monthly' },
+        el('span', {}, 'Cuota ' + M.monthKeyToShort(currentMonth) + ': ', el('strong', {}, fmt(card.monthlyPayment))),
+        el('span', { class: 'cc-monthly-status ' + statusClass }, statusLabel)
+      ),
+      el('div', { class: 'cc-row-actions' },
+        el('button', {
+          type: 'button',
+          class: 'btn btn-ghost btn-small',
+          onClick: (e) => { e.stopPropagation(); togglePayCreditCardMonth(card.id); }
+        }, isPaid ? '↺ Desmarcar' : '✓ Pagado'),
+        el('button', {
+          type: 'button',
+          class: 'btn btn-ghost btn-small',
+          onClick: (e) => { e.stopPropagation(); toggleSkipCreditCardMonth(card.id); }
+        }, isSkipped ? '↺ No saltar' : '✕ Saltar'),
+        el('button', {
+          type: 'button',
+          class: 'btn btn-ghost btn-small',
+          onClick: (e) => { e.stopPropagation(); openUpdateBalanceModal(card.id); }
+        }, '💰 Saldo'),
+        el('button', {
+          type: 'button',
+          class: 'btn btn-ghost btn-small',
+          onClick: (e) => { e.stopPropagation(); openExtraPaymentModal(card.id); }
+        }, '➕ Extra')
+      )
+    );
+    return wrap;
+  }
+
+  function renderCreditCardsView() {
+    const list = $('#creditCardsList');
+    if (!list) return;
+    list.innerHTML = '';
+    const cards = state.creditCards.slice().sort((a, b) => {
+      if (a.inactive !== b.inactive) return a.inactive ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
+    if (cards.length === 0) {
+      list.appendChild(el('div', { class: 'empty-state empty-state-mini' },
+        el('p', {}, 'No tienes tarjetas todavía.'),
+        el('p', { class: 'empty-hint' }, 'Crea una para llevar el control de tu deuda.')
+      ));
+      return;
+    }
+    cards.forEach((c) => list.appendChild(buildCreditCardElement(c)));
+    const totals = M.summarizeCreditCards(state);
+    const totalsNode = el('div', { class: 'summary-card-row cc-totals' },
+      el('div', { class: 'cc-numbers' },
+        el('span', {}, el('strong', {}, fmt(totals.totalBalance)), ' de ', el('strong', {}, fmt(totals.totalLimit)), ' en total'),
+        el('span', {}, 'Disponible: ', el('strong', {}, fmt(totals.totalAvailable)))
+      )
+    );
+    list.appendChild(totalsNode);
+  }
+
+  function openCreditCardForm(id = null) {
+    const form = $('#formCreditCard');
+    form.reset();
+    $('#creditCardId').value = '';
+    $('#btnDeleteCreditCard').style.display = 'none';
+    $('#creditCardStartDate').value = M.toISODate(new Date());
+    const cat = $('#creditCardCategory');
+    cat.innerHTML = '<option value="deudas">💳 Deudas/Créditos</option><option value="otros">📦 Otros</option>';
+
+    if (id) {
+      const card = state.creditCards.find((c) => c.id === id);
+      if (!card) return;
+      $('#creditCardTitle').textContent = 'Editar tarjeta';
+      $('#creditCardId').value = card.id;
+      $('#creditCardName').value = card.name;
+      $('#creditCardMaxLimit').value = card.maxLimit;
+      $('#creditCardMonthlyPayment').value = card.monthlyPayment;
+      $('#creditCardCurrentBalance').value = card.currentBalance;
+      $('#creditCardCategory').value = card.category;
+      $('#creditCardStartDate').value = card.startDate || '';
+      $('#creditCardNotes').value = card.notes || '';
+      $('#btnDeleteCreditCard').style.display = 'inline-flex';
+    } else {
+      $('#creditCardTitle').textContent = 'Nueva tarjeta';
+    }
+    openModal('modalCreditCard');
+    setTimeout(() => $('#creditCardName').focus(), 60);
+  }
+
+  function submitCreditCardForm(e) {
+    e.preventDefault();
+    const id = $('#creditCardId').value;
+    const payload = {
+      name: $('#creditCardName').value.trim(),
+      maxLimit: Number($('#creditCardMaxLimit').value) || 0,
+      monthlyPayment: Number($('#creditCardMonthlyPayment').value) || 0,
+      currentBalance: Number($('#creditCardCurrentBalance').value) || 0,
+      category: $('#creditCardCategory').value,
+      startDate: $('#creditCardStartDate').value || '',
+      notes: $('#creditCardNotes').value.trim()
+    };
+    if (!payload.name) { toast('Nombre vacío'); return; }
+    if (id) {
+      state = A.updateCreditCard(state, id, payload);
+      toast('Tarjeta actualizada');
+    } else {
+      state = A.createCreditCard(state, payload);
+      toast('Tarjeta creada');
+    }
+    persist();
+    closeModal('modalCreditCard');
+    renderCreditCardsView();
+  }
+
+  function deleteCreditCard(id) {
+    if (!confirm('¿Eliminar esta tarjeta? También se eliminarán los gastos vinculados.')) return;
+    state = A.deleteCreditCard(state, id);
+    persist();
+    closeModal('modalCreditCard');
+    renderCreditCardsView();
+    toast('Tarjeta eliminada');
+  }
+
+  function toggleCreditCard(id) {
+    state = A.toggleCreditCardInactive(state, id);
+    persist();
+    renderCreditCardsView();
+    const card = state.creditCards.find((c) => c.id === id);
+    toast(card && card.inactive ? 'Tarjeta desactivada' : 'Tarjeta reactivada');
+  }
+
+  function togglePayCreditCardMonth(id) {
+    state = A.payCreditCardMonth(state, id, currentMonth);
+    persist();
+    renderCreditCardsView();
+  }
+
+  function toggleSkipCreditCardMonth(id) {
+    state = A.skipCreditCardMonth(state, id, currentMonth);
+    persist();
+    renderCreditCardsView();
+  }
+
+  function openUpdateBalanceModal(id) {
+    const card = state.creditCards.find((c) => c.id === id);
+    if (!card) return;
+    $('#updateBalanceCardId').value = id;
+    $('#updateBalanceAmount').value = card.currentBalance;
+    $('#updateBalanceLabel').textContent = `Tarjeta: ${card.name}. Saldo actual: ${fmt(card.currentBalance)}`;
+    openModal('modalUpdateBalance');
+    setTimeout(() => $('#updateBalanceAmount').focus(), 60);
+  }
+
+  function submitUpdateBalance(e) {
+    e.preventDefault();
+    const id = $('#updateBalanceCardId').value;
+    const amount = Number($('#updateBalanceAmount').value);
+    if (!id || isNaN(amount)) { toast('Datos no válidos'); return; }
+    state = A.updateCreditCardBalance(state, id, amount);
+    persist();
+    closeModal('modalUpdateBalance');
+    renderCreditCardsView();
+    toast('Saldo actualizado');
+  }
+
+  function openExtraPaymentModal(id) {
+    const card = state.creditCards.find((c) => c.id === id);
+    if (!card) return;
+    $('#extraPaymentCardId').value = id;
+    $('#extraPaymentAmount').value = '';
+    $('#extraPaymentLabel').textContent = `Tarjeta: ${card.name}. Saldo actual: ${fmt(card.currentBalance)}`;
+    openModal('modalExtraPayment');
+    setTimeout(() => $('#extraPaymentAmount').focus(), 60);
+  }
+
+  function submitExtraPayment(e) {
+    e.preventDefault();
+    const id = $('#extraPaymentCardId').value;
+    const amount = Number($('#extraPaymentAmount').value);
+    if (!id || !amount || amount <= 0) { toast('Importe no válido'); return; }
+    state = A.addExtraPayment(state, id, amount, currentMonth);
+    persist();
+    closeModal('modalExtraPayment');
+    renderCreditCardsView();
+    toast('Pago extra registrado');
+  }
+
+  // ---------- Saldo a principios de mes (DESHABILITADO) ----------
+  /*
+  function renderBalanceSection() {
+    const amountEl = $('#balanceAmount');
+    const infoEl = $('#balanceInfo');
+    if (!amountEl || !infoEl) return;
+    const monthBalance = M.getLatestBalance(state, currentMonth);
+    if (monthBalance) {
+      amountEl.textContent = fmt(monthBalance.balance);
+      infoEl.textContent = `Saldo a 1 de ${M.monthKeyToLabel(currentMonth).toLowerCase()}`;
+      return;
+    }
+    const balanceEntries = (state.balanceEntries || [])
+      .filter((b) => b.monthKey < currentMonth)
+      .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+    const lastEntry = balanceEntries[0];
+    if (lastEntry) {
+      let running = lastEntry.balance;
+      let m = lastEntry.monthKey;
+      while (m < currentMonth) {
+        m = M.addMonths(m, 1);
+        const monthSum = M.summarize(state, m);
+        running += monthSum.totalIncome - monthSum.totalExpenses;
+      }
+      amountEl.textContent = fmt(running);
+      infoEl.textContent = `Estimación (saldo a 1 de ${M.monthKeyToLabel(currentMonth).toLowerCase()}, contando toda la actividad ya puesta)`;
+      return;
+    }
+    amountEl.textContent = '—';
+    infoEl.textContent = 'Sin registros';
+  }
+
+  function openSetBalanceModal() {
+    const latest = M.getLatestBalance(state);
+    $('#setBalanceAmount').value = latest ? latest.balance : '';
+    $('#setBalanceMonth').value = currentMonth;
+    $('#setBalanceHint').textContent = `Mes actual: ${M.monthKeyToLabel(currentMonth)}. El ahorro/desahorro se registrará como ingreso de ${M.monthKeyToLabel(M.addMonths(currentMonth, -1))}.`;
+    openModal('modalSetBalance');
+    setTimeout(() => $('#setBalanceAmount').focus(), 60);
+  }
+
+  function submitSetBalance(e) {
+    e.preventDefault();
+    const amount = Number($('#setBalanceAmount').value);
+    if (isNaN(amount) || amount < 0) { toast('Importe no válido'); return; }
+    state = A.setBalance(state, currentMonth, amount);
+    persist();
+    closeModal('modalSetBalance');
+    render();
+    toast('Saldo actualizado');
+  }
+  */
 
   // ---------- Ajustes ----------
   function bindSettings() {
@@ -1435,6 +1754,20 @@
     $('#btnNewIncome').addEventListener('click', () => openIncomeForm());
     $('#btnNewBudget').addEventListener('click', () => openBudgetForm());
     $('#btnNewSubcategory').addEventListener('click', () => openSubcategoryForm());
+
+    // Tarjetas de crédito
+    $('#btnNewCreditCard').addEventListener('click', () => openCreditCardForm());
+    $('#formCreditCard').addEventListener('submit', submitCreditCardForm);
+    $('#btnDeleteCreditCard').addEventListener('click', () => {
+      const id = $('#creditCardId').value;
+      if (id) deleteCreditCard(id);
+    });
+    $('#formUpdateBalance').addEventListener('submit', submitUpdateBalance);
+    $('#formExtraPayment').addEventListener('submit', submitExtraPayment);
+
+    // Saldo de cuenta
+    // $('#btnUpdateBalance').addEventListener('click', openSetBalanceModal); // DESHABILITADO
+    // $('#formSetBalance').addEventListener('submit', submitSetBalance); // DESHABILITADO
 
     // Segmented tipo gasto
     $$('#expenseTypeSeg .seg').forEach((b) => {

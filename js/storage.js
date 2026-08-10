@@ -29,6 +29,8 @@
         income: state.income,
         budgets: state.budgets || [],
         subcategories: state.subcategories || [],
+        creditCards: state.creditCards || [],
+        // balanceEntries: state.balanceEntries || [],
         settings: state.settings
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -75,6 +77,12 @@
     if (Array.isArray(data.subcategories)) {
       state.subcategories = data.subcategories.map((s) => Models.normalizeSubcategory(s));
     }
+    if (Array.isArray(data.creditCards)) {
+      state.creditCards = data.creditCards.map((c) => Models.normalizeCreditCard(c));
+    }
+    // if (Array.isArray(data.balanceEntries)) {
+    //   state.balanceEntries = data.balanceEntries.map((b) => Models.normalizeBalanceEntry(b));
+    // }
     state.settings = Models.normalizeSettings(data.settings || {});
     return state;
   }
@@ -88,6 +96,8 @@
       income: state.income,
       budgets: state.budgets || [],
       subcategories: state.subcategories || [],
+      creditCards: state.creditCards || [],
+      balanceEntries: state.balanceEntries || [],
       settings: state.settings
     };
     const json = JSON.stringify(payload, null, 2);
@@ -138,6 +148,12 @@
           if (Array.isArray(data.subcategories)) {
             newState.subcategories = data.subcategories.map((s) => Models.normalizeSubcategory(s));
           }
+          if (Array.isArray(data.creditCards)) {
+            newState.creditCards = data.creditCards.map((c) => Models.normalizeCreditCard(c));
+          }
+          // if (Array.isArray(data.balanceEntries)) {
+          //   newState.balanceEntries = data.balanceEntries.map((b) => Models.normalizeBalanceEntry(b));
+          // }
           newState.settings = Models.normalizeSettings(data.settings || {});
 
           if (mode === 'merge') {
@@ -150,10 +166,13 @@
             newState.budgets.forEach((b) => budMap.set(b.id, b));
             const subMap = new Map((current.subcategories || []).map((s) => [s.id, s]));
             newState.subcategories.forEach((s) => subMap.set(s.id, s));
+            const ccMap = new Map((current.creditCards || []).map((c) => [c.id, c]));
+            newState.creditCards.forEach((c) => ccMap.set(c.id, c));
             newState.expenses = Array.from(expMap.values());
             newState.income = Array.from(incMap.values());
             newState.budgets = Array.from(budMap.values());
             newState.subcategories = Array.from(subMap.values());
+            newState.creditCards = Array.from(ccMap.values());
           }
 
           resolve(newState);

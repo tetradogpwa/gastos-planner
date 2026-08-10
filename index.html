@@ -92,6 +92,24 @@
           </div>
         </div>
 
+        <!-- Balance section (DESHABILITADO) -->
+        <!--
+        <div class="section" id="balanceSection">
+          <div class="section-header">
+            <h2 class="section-title">Saldo de cuenta</h2>
+            <button class="text-btn" id="btnUpdateBalance">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><polyline points="21 3 21 8 16 8"/></svg>
+              Actualizar
+            </button>
+          </div>
+          <p class="section-hint">Indica el saldo actual de tu cuenta. El ahorro (o desahorro) se registrará como ingreso del mes anterior.</p>
+          <div class="balance-card" id="balanceCard">
+            <div class="balance-amount" id="balanceAmount">—</div>
+            <div class="balance-info" id="balanceInfo">Sin registros</div>
+          </div>
+        </div>
+        -->
+
         <!-- Budgets section -->
         <div class="section" id="budgetSection">
           <div class="section-header">
@@ -208,6 +226,26 @@
             <div class="empty-state">
               <div class="empty-icon">📅</div>
               <p>Añade gastos o ingresos para ver tu línea de tiempo.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View: Tarjetas de crédito -->
+      <section class="view" data-view="tarjetas">
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Mis tarjetas</h2>
+            <button class="text-btn" id="btnNewCreditCard">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nueva
+            </button>
+          </div>
+          <p class="section-hint">Tarjetas revolving. Controla el límite, saldo y cuota mensual.</p>
+          <div class="items-list" id="creditCardsList">
+            <div class="empty-state empty-state-mini">
+              <p>No tienes tarjetas todavía.</p>
+              <p class="empty-hint">Crea una para llevar el control de tu deuda.</p>
             </div>
           </div>
         </div>
@@ -331,18 +369,37 @@
           </div>
 
           <div class="about-box">
-            <p><strong>Mis Gastos</strong> · v1.0</p>
-            <p>Tus datos se guardan solo en este dispositivo. Usa Exportar/Importar para moverlos entre dispositivos.</p>
+            <div class="app-brand">
+              <div class="app-brand-icon">💰</div>
+              <div class="app-brand-info">
+                <div class="app-brand-name">Mis Gastos</div>
+                <div class="app-brand-version">v2.0</div>
+              </div>
+            </div>
+            <p class="app-brand-desc">Tus datos se guardan solo en este dispositivo. Usa Exportar/Importar para moverlos entre dispositivos.</p>
+            <a href="https://minimax.io" target="_blank" rel="noopener" class="powered-by">
+              <span>Powered by</span>
+              <strong>MiniMax</strong>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </a>
           </div>
         </div>
       </section>
     </main>
+
+    <div class="app-footer">
+      <a href="https://minimax.io" target="_blank" rel="noopener" class="app-footer-link">Mis Gastos v2.0 · Powered by MiniMax</a>
+    </div>
 
     <!-- Bottom navigation -->
     <nav class="bottom-nav" role="tablist">
       <button class="nav-item nav-active" data-nav="resumen" role="tab">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         <span>Resumen</span>
+      </button>
+      <button class="nav-item" data-nav="tarjetas" role="tab">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        <span>Tarjetas</span>
       </button>
       <button class="nav-item" data-nav="gastos" role="tab">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -424,6 +481,14 @@
               <option value="">— Sin asignar —</option>
             </select>
             <p class="field-hint">Si lo enlazas, el gasto se descontará de ese presupuesto.</p>
+          </div>
+
+          <div class="field" id="expenseCreditCardWrap">
+            <label for="expenseCreditCard">Tarjeta de crédito (opcional)</label>
+            <select id="expenseCreditCard">
+              <option value="">— Sin tarjeta —</option>
+            </select>
+            <p class="field-hint">Si compras con tarjeta, el gasto se deduce de su disponible y NO aparece en el balance (lo paga la tarjeta).</p>
           </div>
 
           <div class="field">
@@ -733,6 +798,142 @@
       </div>
     </div>
 
+    <!-- Modal: Add/Edit Credit Card -->
+    <div class="modal" id="modalCreditCard" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet" role="dialog" aria-labelledby="creditCardTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="creditCardTitle">Nueva tarjeta</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="formCreditCard" class="form">
+          <input type="hidden" id="creditCardId" />
+          <div class="field">
+            <label for="creditCardName">Nombre</label>
+            <input type="text" id="creditCardName" required maxlength="40" placeholder="Ej. Visa Oro, Mastercard, Amex…" />
+          </div>
+          <div class="field-row">
+            <div class="field field-grow">
+              <label for="creditCardMaxLimit">Límite de crédito</label>
+              <input type="number" id="creditCardMaxLimit" required min="0" step="0.01" inputmode="decimal" placeholder="0,00" />
+            </div>
+            <div class="field field-grow">
+              <label for="creditCardMonthlyPayment">Cuota mensual</label>
+              <input type="number" id="creditCardMonthlyPayment" required min="0" step="0.01" inputmode="decimal" placeholder="0,00" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field field-grow">
+              <label for="creditCardCurrentBalance">Saldo actual</label>
+              <input type="number" id="creditCardCurrentBalance" min="0" step="0.01" inputmode="decimal" placeholder="0,00" />
+              <p class="field-hint">Déjalo en 0 si aún no la has usado.</p>
+            </div>
+            <div class="field">
+              <label for="creditCardCategory">Categoría</label>
+              <select id="creditCardCategory">
+                <option value="deudas">💳 Deudas/Créditos</option>
+                <option value="otros">📦 Otros</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="creditCardStartDate">Fecha de inicio</label>
+            <input type="date" id="creditCardStartDate" />
+          </div>
+          <div class="field">
+            <label for="creditCardNotes">Notas (opcional)</label>
+            <textarea id="creditCardNotes" rows="2" maxlength="200"></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" id="btnDeleteCreditCard" style="display:none;color:#ef4444">Eliminar</button>
+            <button type="submit" class="btn btn-primary btn-grow">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Update Balance (DESHABILITADO) -->
+    <!--
+    <div class="modal" id="modalUpdateBalance" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet" role="dialog" aria-labelledby="updateBalanceTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="updateBalanceTitle">Actualizar saldo</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="formUpdateBalance" class="form">
+          <input type="hidden" id="updateBalanceCardId" />
+          <p class="field-hint" id="updateBalanceLabel">¿Cuánto debes ahora?</p>
+          <div class="field">
+            <label for="updateBalanceAmount">Saldo actual</label>
+            <input type="number" id="updateBalanceAmount" required min="0" step="0.01" inputmode="decimal" placeholder="0,00" />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-grow">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    -->
+
+    <!-- Modal: Extra Payment -->
+    <div class="modal" id="modalExtraPayment" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet" role="dialog" aria-labelledby="extraPaymentTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="extraPaymentTitle">Pago extra</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="formExtraPayment" class="form">
+          <input type="hidden" id="extraPaymentCardId" />
+          <p class="field-hint" id="extraPaymentLabel">Pago extra para reducir el saldo.</p>
+          <div class="field">
+            <label for="extraPaymentAmount">Importe</label>
+            <input type="number" id="extraPaymentAmount" required min="0.01" step="0.01" inputmode="decimal" placeholder="0,00" />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-grow">Pagar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Set Balance (DESHABILITADO) -->
+    <!--
+    <div class="modal" id="modalSetBalance" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet" role="dialog" aria-labelledby="setBalanceTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="setBalanceTitle">Actualizar saldo</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="formSetBalance" class="form">
+          <input type="hidden" id="setBalanceMonth" />
+          <p class="field-hint" id="setBalanceHint">El ahorro o desahorro se registrará como ingreso del mes anterior.</p>
+          <div class="field">
+            <label for="setBalanceAmount">Saldo actual</label>
+            <input type="number" id="setBalanceAmount" required min="0" step="0.01" inputmode="decimal" placeholder="0,00" />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-grow">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    -->
+
     <!-- Modal: Budget Conflict -->
     <div class="modal" id="modalBudgetConflict" aria-hidden="true">
       <div class="modal-backdrop" data-close></div>
@@ -778,6 +979,7 @@
 
   <script src="js/models.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/actions.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
