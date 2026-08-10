@@ -28,7 +28,8 @@
   const EXPENSE_TYPES = {
     fixed: { label: 'Fijo', tag: 'Fijo', short: 'Fijo' },
     temporary: { label: 'Temporal', tag: 'Temporal', short: 'Temporal' },
-    variable: { label: 'Variable', tag: 'Variable', short: 'Variable' }
+    variable: { label: 'Variable', tag: 'Variable', short: 'Variable' },
+    unico: { label: 'Único', tag: 'Único', short: 'Único' }
   };
 
   const INCOME_TYPES = {
@@ -36,10 +37,19 @@
     extra: { label: 'Puntual', tag: 'Puntual', short: 'Puntual' }
   };
 
+  // Paleta de iconos para picker (presupuestos y subcategorías)
+  const ICON_OPTIONS = [
+    { group: 'General', icons: ['💼','📌','🎯','⭐','🔖','🏷️','📎','🛒','📦','🎁','💰','💳'] },
+    { group: 'Hogar', icons: ['🏠','🛋️','🧹','💡','🔌','🚿','🛁','🛏️','🍽️','🧺','🔧','🪴'] },
+    { group: 'Comida', icons: ['🍔','🍕','🍝','🍣','🥗','🍞','🍎','☕','🍺','🍷','🥖','🍰','🍳','🥖','🧀'] },
+    { group: 'Transporte', icons: ['🚗','⛽','🅿️','🚌','🚇','✈️','🚲','🔧','🛞','🚕','🚆'] },
+    { group: 'Salud', icons: ['💊','🩺','🏥','🦷','👓','💪','🧘','🧴'] },
+    { group: 'Ocio', icons: ['🎮','🎬','🎵','📚','🎨','⚽','🏊','🎸','🎭','🎲'] },
+    { group: 'Trabajo', icons: ['💻','📊','📈','🖥️','📞','📝','✏️'] },
+    { group: 'Otros', icons: ['🎓','🐾','👶','👕','💍','🛡️','🌐'] }
+  ];
+
   // ---------- Utilidades de fecha ----------
-  /**
-   * Convierte un Date o string ISO a 'YYYY-MM-DD' usando la fecha local (no UTC).
-   */
   function toISODate(value) {
     if (!value) return '';
     if (typeof value === 'string') return value.slice(0, 10);
@@ -56,9 +66,6 @@
     return new Date(y, m - 1, d);
   }
 
-  /**
-   * Devuelve el primer día del mes dado. monthKey = 'YYYY-MM'.
-   */
   function firstOfMonth(monthKey) {
     const [y, m] = monthKey.split('-').map(Number);
     return new Date(y, m - 1, 1);
@@ -104,7 +111,6 @@
     return `${MONTH_NAMES_SHORT[m - 1]} ${y}`;
   }
 
-  // ---------- UUID ----------
   function uuid() {
     if (crypto && crypto.randomUUID) return crypto.randomUUID();
     return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -114,19 +120,26 @@
   function normalizeExpense(raw) {
     const paidMonths = (raw.paidMonths && typeof raw.paidMonths === 'object') ? raw.paidMonths : {};
     const skippedMonths = (raw.skippedMonths && typeof raw.skippedMonths === 'object') ? raw.skippedMonths : {};
+    const pendingMonths = (raw.pendingMonths && typeof raw.pendingMonths === 'object') ? raw.pendingMonths : {};
+    const type = ['fixed', 'temporary', 'variable', 'unico'].includes(raw.type) ? raw.type : 'fixed';
     return {
       id: raw.id || uuid(),
       name: String(raw.name || '').trim(),
       amount: Number(raw.amount) || 0,
-      type: ['fixed', 'temporary', 'variable'].includes(raw.type) ? raw.type : 'fixed',
+      type,
       category: CATEGORIES[raw.category] ? raw.category : 'otros',
+      subcategoryId: raw.subcategoryId || null,
+      budgetId: raw.budgetId || null,
       startDate: raw.startDate || '',
       endDate: raw.endDate || null,
-      targetMonth: raw.targetMonth || null, // solo para variable
+      targetMonth: raw.targetMonth || null,
       optional: !!raw.optional,
-      oneTime: !!raw.oneTime,
+      inactive: !!raw.inactive,
+      // Único siempre es oneTime
+      oneTime: type === 'unico' ? true : !!raw.oneTime,
       paidMonths,
       skippedMonths,
+      pendingMonths,
       amountHistory: normalizeAmountHistory(raw.amountHistory, raw.startDate, raw.amount),
       notes: String(raw.notes || ''),
       createdAt: raw.createdAt || new Date().toISOString(),
@@ -141,10 +154,37 @@
       amount: Number(raw.amount) || 0,
       type: ['recurring', 'extra'].includes(raw.type) ? raw.type : 'recurring',
       category: CATEGORIES[raw.category] ? raw.category : 'nomina',
+      subcategoryId: raw.subcategoryId || null,
       startDate: raw.startDate || '',
       endDate: raw.endDate || null,
-      targetMonth: raw.targetMonth || null, // solo para extra
+      targetMonth: raw.targetMonth || null,
       amountHistory: normalizeAmountHistory(raw.amountHistory, raw.startDate, raw.amount),
+      notes: String(raw.notes || ''),
+      createdAt: raw.createdAt || new Date().toISOString(),
+      updatedAt: raw.updatedAt || new Date().toISOString()
+    };
+  }
+
+  function normalizeSubcategory(raw) {
+    return {
+      id: raw.id || uuid(),
+      category: CATEGORIES[raw.category] ? raw.category : 'otros',
+      label: String(raw.label || '').trim().slice(0, 30),
+      icon: String(raw.icon || '').slice(0, 4) || '📦',
+      createdAt: raw.createdAt || new Date().toISOString(),
+      updatedAt: raw.updatedAt || new Date().toISOString()
+    };
+  }
+
+  function normalizeBudget(raw) {
+    return {
+      id: raw.id || uuid(),
+      category: CATEGORIES[raw.category] ? raw.category : 'otros',
+      subcategoryId: raw.subcategoryId || null,
+      amount: Number(raw.amount) || 0,
+      icon: raw.icon ? String(raw.icon).slice(0, 4) : null,
+      startDate: raw.startDate || '',
+      endDate: raw.endDate || null,
       notes: String(raw.notes || ''),
       createdAt: raw.createdAt || new Date().toISOString(),
       updatedAt: raw.updatedAt || new Date().toISOString()
@@ -153,7 +193,6 @@
 
   function normalizeAmountHistory(raw, fallbackStartDate, fallbackAmount) {
     if (!Array.isArray(raw)) {
-      // Sin historial previo: crear una entrada implícita con startDate y amount
       if (fallbackStartDate || fallbackAmount) {
         return [{ fromDate: fallbackStartDate || toISODate(new Date()), amount: Number(fallbackAmount) || 0 }];
       }
@@ -177,24 +216,18 @@
 
   function newState() {
     return {
-      version: 1,
+      version: 2,
       expenses: [],
       income: [],
+      budgets: [],
+      subcategories: [],
       settings: normalizeSettings({})
     };
   }
 
   // ---------- Reglas de proyección ----------
-  /**
-   * Determina si un item (gasto o ingreso) está activo en el mes monthKey.
-   * Reglas:
-   *  - fixed / temporary / recurring: aplica si startDate <= fin de mes
-   *    y (endDate == null OR endDate >= inicio de mes).
-   *  - variable / extra: aplica si targetMonth == monthKey.
-   *  - Si startDate está vacío, se considera "desde el inicio de los tiempos"
-   *    (no aparece en histórico hasta el mes actual).
-   */
   function appliesToMonth(item, monthKey) {
+    if (item.inactive) return false;
     const monthStart = firstOfMonth(monthKey);
     const monthEnd = lastOfMonth(monthKey);
 
@@ -202,8 +235,21 @@
       return item.targetMonth === monthKey;
     }
 
-    // Para items recurrentes (fixed, temporary, recurring income)
-    // Si no hay startDate, lo consideramos activo desde el mes actual
+    if (item.type === 'unico') {
+      // Si ya está confirmado, sigue contando ese mes
+      if (item.paidMonths && item.paidMonths[monthKey]) return true;
+      if (item.skippedMonths && item.skippedMonths[monthKey]) return false;
+      // Si tiene targetMonth, solo aparece ese mes
+      if (item.targetMonth) return item.targetMonth === monthKey;
+      // Si tiene startDate, aparece el mes de la fecha
+      if (item.startDate) {
+        const d = parseISODate(item.startDate);
+        return d && d >= monthStart && d <= monthEnd;
+      }
+      return false;
+    }
+
+    // fixed / temporary / recurring
     if (!item.startDate) {
       if (compareMonthKeys(monthKey, todayMonthKey()) < 0) return false;
     } else {
@@ -216,28 +262,37 @@
       }
     }
 
-    // Gastos opcionales: solo cuentan los meses confirmados explícitamente
     if (item.optional) {
       return !!(item.paidMonths && item.paidMonths[monthKey]);
+    }
+
+    // No opcional: si está marcado como pendiente y no pagado, no aplica
+    if (item.pendingMonths && item.pendingMonths[monthKey] && !(item.paidMonths && item.paidMonths[monthKey])) {
+      return false;
     }
 
     return true;
   }
 
-  /**
-   * Devuelve los items aplicables al mes, ordenados:
-   *  - Expenses primero (por categoría, luego nombre)
-   *  - Income después
-   */
   function getItemsForMonth(state, monthKey) {
     const expenses = state.expenses
       .filter((e) => appliesToMonth(e, monthKey))
-      .map((e) => ({ ...e, _kind: 'expense', effectiveAmount: effectiveAmountAt(e, monthKey) }))
+      .map((e) => ({
+        ...e,
+        _kind: 'expense',
+        effectiveAmount: effectiveAmountAt(e, monthKey),
+        effectiveIcon: effectiveIconFor(e, state)
+      }))
       .sort(sortItem);
 
     const income = state.income
       .filter((i) => appliesToMonth(i, monthKey))
-      .map((i) => ({ ...i, _kind: 'income', effectiveAmount: effectiveAmountAt(i, monthKey) }))
+      .map((i) => ({
+        ...i,
+        _kind: 'income',
+        effectiveAmount: effectiveAmountAt(i, monthKey),
+        effectiveIcon: effectiveIconFor(i, state)
+      }))
       .sort(sortItem);
 
     return { expenses, income, all: [...expenses, ...income] };
@@ -245,7 +300,7 @@
 
   function sortItem(a, b) {
     if (a.type !== b.type) {
-      const order = { fixed: 0, recurring: 0, temporary: 1, variable: 2, extra: 2 };
+      const order = { fixed: 0, recurring: 0, temporary: 1, variable: 2, extra: 2, unico: 3 };
       return (order[a.type] ?? 9) - (order[b.type] ?? 9);
     }
     if (a.category !== b.category) return a.category.localeCompare(b.category);
@@ -265,15 +320,10 @@
     };
   }
 
-  /**
-   * Encuentra el primer y último mes en los que cualquier item está activo.
-   * Si no hay items, devuelve { first: today, last: today }.
-   */
   function stateDateRange(state) {
     const keys = new Set();
     const t = todayMonthKey();
     const today = firstOfMonth(t);
-    // Considerar también el mes actual y un margen
     let earliest = today;
     let latest = today;
 
@@ -287,6 +337,18 @@
             if (d < earliest) earliest = d;
             if (d > latest) latest = d;
           }
+        } else if (it.type === 'unico') {
+          if (it.targetMonth) {
+            const d = firstOfMonth(it.targetMonth);
+            if (d < earliest) earliest = d;
+            if (d > latest) latest = d;
+          } else if (it.startDate) {
+            const s = parseISODate(it.startDate);
+            if (s) {
+              if (s < earliest) earliest = s;
+              if (s > latest) latest = s;
+            }
+          }
         } else {
           if (it.startDate) {
             const s = parseISODate(it.startDate);
@@ -295,14 +357,12 @@
               if (s < earliest) earliest = s;
               if (e && e > latest) latest = e;
               else if (!e) {
-                // Sin fin: añadimos 12 meses hacia el futuro para el timeline
                 const future = new Date(today);
                 future.setMonth(future.getMonth() + 12);
                 if (future > latest) latest = future;
               }
             }
           } else {
-            // sin fecha: solo desde hoy
             if (today > latest) latest = today;
           }
         }
@@ -311,15 +371,12 @@
 
     collect(state.expenses);
     collect(state.income);
+    collect(state.budgets);
 
     const toKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     return { first: toKey(earliest), last: toKey(latest) };
   }
 
-  /**
-   * Devuelve una lista de meses entre first y last (inclusivo) y
-   * el resumen de cada uno. Pensado para el timeline.
-   */
   function getTimeline(state) {
     const range = stateDateRange(state);
     const result = [];
@@ -336,10 +393,6 @@
     return result;
   }
 
-  /**
-   * Devuelve los meses en los que un item está activo.
-   * Útil para mostrar "próximos cobros" o info de cada item.
-   */
   function monthsForItem(item, fromKey, toKey) {
     const out = [];
     let cur = fromKey;
@@ -352,16 +405,15 @@
     return out;
   }
 
-  /**
-   * Texto humano de la vigencia de un item.
-   *  - "Activo siempre" (sin endDate)
-   *  - "Hasta oct 2026" (con endDate)
-   *  - "Solo oct 2026" (variable / extra)
-   */
   function validityText(item) {
     if (item.type === 'variable' || item.type === 'extra') {
       if (!item.targetMonth) return 'Mes no definido';
       return `Solo ${monthKeyToShort(item.targetMonth)}`;
+    }
+    if (item.type === 'unico') {
+      if (item.targetMonth) return `Solo ${monthKeyToShort(item.targetMonth)}`;
+      if (item.startDate) return `Fecha: ${formatShortDate(item.startDate)}`;
+      return 'Fecha no definida';
     }
     if (!item.startDate && !item.endDate) return 'Activo siempre';
     const startLabel = item.startDate ? formatShortDate(item.startDate) : '—';
@@ -385,17 +437,11 @@
     return diffDays >= 0 && diffDays <= 31;
   }
 
-  /**
-   * Devuelve true si el item es opcional pero no está confirmado para el mes monthKey
-   * (está dentro de su rango, pero pendiente de que el usuario lo marque como pagado).
-   */
   function isPendingOptional(item, monthKey) {
-    if (!item || !item.optional) return false;
-    // Pago único: si ya se pagó alguna vez, ya está hecho y nunca más vuelve a salir como pendiente
+    if (!item || !item.optional || item.inactive) return false;
     if (item.oneTime && item.paidMonths && Object.keys(item.paidMonths).length > 0) return false;
     if (item.paidMonths && item.paidMonths[monthKey]) return false;
     if (item.skippedMonths && item.skippedMonths[monthKey]) return false;
-    // ¿Entraría en este mes si NO fuera opcional? Si ya no aplica por rango, no es "pendiente"
     return wouldApplyIfMandatory(item, monthKey);
   }
 
@@ -404,6 +450,15 @@
     const monthEnd = lastOfMonth(monthKey);
     if (item.type === 'variable' || item.type === 'extra') {
       return item.targetMonth === monthKey;
+    }
+    if (item.type === 'unico') {
+      if (item.paidMonths && item.paidMonths[monthKey]) return true;
+      if (item.targetMonth) return item.targetMonth === monthKey;
+      if (item.startDate) {
+        const d = parseISODate(item.startDate);
+        return d && d >= monthStart && d <= monthEnd;
+      }
+      return false;
     }
     if (!item.startDate) {
       return compareMonthKeys(monthKey, todayMonthKey()) >= 0;
@@ -431,10 +486,38 @@
     return months;
   }
 
+  function togglePendingMonth(item, monthKey, pending) {
+    const months = { ...(item.pendingMonths || {}) };
+    if (pending) months[monthKey] = true;
+    else delete months[monthKey];
+    return months;
+  }
+
   /**
-   * Devuelve el importe que aplicaba al mes monthKey según el historial.
-   * Si no hay historial, devuelve item.amount.
+   * Devuelve todos los pagos pendientes de gastos no opcionales.
+   * Cada elemento: { item, monthKey, amount }.
+   * Excluye los meses que ya están pagados y los que no aplicarían.
    */
+  function getPendingMandatory(state, monthKey) {
+    const out = [];
+    state.expenses.forEach((e) => {
+      if (e.optional) return;
+      if (!e.pendingMonths) return;
+      Object.keys(e.pendingMonths).forEach((mk) => {
+        if (!e.pendingMonths[mk]) return;
+        if (e.paidMonths && e.paidMonths[mk]) return;
+        if (mk !== monthKey) return;
+        if (!wouldApplyIfMandatory(e, mk)) return;
+        out.push({
+          item: e,
+          monthKey: mk,
+          amount: effectiveAmountAt(e, mk)
+        });
+      });
+    });
+    return out.sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  }
+
   function effectiveAmountAt(item, monthKey) {
     const history = Array.isArray(item.amountHistory) ? item.amountHistory : [];
     if (history.length === 0) return Number(item.amount) || 0;
@@ -451,12 +534,123 @@
     return result;
   }
 
-  // ---------- Formato de moneda ----------
+  // ---------- Subcategorías ----------
+  function getSubcategoriesForCategory(state, categoryKey) {
+    return state.subcategories
+      .filter((s) => s.category === categoryKey)
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  function getSubcategory(state, id) {
+    if (!id) return null;
+    return state.subcategories.find((s) => s.id === id) || null;
+  }
+
+  function deleteSubcategory(state, id) {
+    const expenseCount = state.expenses.filter((e) => e.subcategoryId === id).length;
+    const incomeCount = state.income.filter((i) => i.subcategoryId === id).length;
+    const budgetCount = state.budgets.filter((b) => b.subcategoryId === id).length;
+    return { expenseCount, incomeCount, budgetCount };
+  }
+
+  function effectiveIconFor(item, state) {
+    if (item.icon) return item.icon;
+    if (item.subcategoryId) {
+      const sub = getSubcategory(state, item.subcategoryId);
+      if (sub) return sub.icon;
+    }
+    const cat = CATEGORIES[item.category];
+    return cat ? cat.icon : '📦';
+  }
+
+  // ---------- Presupuestos ----------
+  function appliesBudgetToMonth(budget, monthKey) {
+    const monthStart = firstOfMonth(monthKey);
+    const monthEnd = lastOfMonth(monthKey);
+    if (budget.startDate) {
+      const start = parseISODate(budget.startDate);
+      if (start > monthEnd) return false;
+      if (budget.endDate) {
+        const end = parseISODate(budget.endDate);
+        if (end < monthStart) return false;
+      }
+    }
+    return true;
+  }
+
+  function getBudgetsForMonth(state, monthKey) {
+    return state.budgets
+      .filter((b) => appliesBudgetToMonth(b, monthKey))
+      .map((b) => ({
+        ...b,
+        effectiveIcon: b.icon || effectiveIconFor(b, state)
+      }))
+      .sort((a, b) => a.category.localeCompare(b.category) || a.amount - b.amount);
+  }
+
   /**
-   * Formato manual para evitar depender de ICU completo del navegador.
-   *  - EUR / GBP: 1.234,56 € (símbolo al final)
-   *  - resto:     $1,234.56  (símbolo delante, separadores US)
+   * Devuelve el progreso de cada presupuesto en el mes:
+   * - budget, spent, free, pct
+   * - spent = suma de gastos (confirmados o automáticos) que coincidan
+   *   en categoría (y subcategoría si el presupuesto la tiene fijada).
+   * - Si el gasto es opcional y no está confirmado, NO cuenta.
+   * - Si el gasto es variable y tiene targetMonth != monthKey, no cuenta.
+   * - Si el gasto es único y su mes (target o fecha) != monthKey, no cuenta.
    */
+  function getBudgetProgress(state, monthKey) {
+    const { expenses } = getItemsForMonth(state, monthKey);
+    const result = [];
+    const budgets = getBudgetsForMonth(state, monthKey);
+    budgets.forEach((b) => {
+      const spent = expenses
+        .filter((e) => e.budgetId === b.id && (e.type === 'variable' || e.type === 'unico' || e.type === 'temporary'))
+        .reduce((s, e) => s + (e.effectiveAmount || 0), 0);
+      const free = (b.amount || 0) - spent;
+      const pct = b.amount > 0 ? Math.min(100, Math.round((spent / b.amount) * 100)) : 0;
+      result.push({
+        budget: b,
+        spent,
+        free,
+        pct,
+        over: spent > b.amount
+      });
+    });
+    return result;
+  }
+
+  function summarizeBudgets(state, monthKey) {
+    const progress = getBudgetProgress(state, monthKey);
+    const totalAssigned = progress.reduce((s, p) => s + (p.budget.amount || 0), 0);
+    const totalSpent = progress.reduce((s, p) => s + p.spent, 0);
+    const totalFree = totalAssigned - totalSpent;
+    return { totalAssigned, totalSpent, totalFree, count: progress.length };
+  }
+
+  /**
+   * Busca presupuestos existentes para la misma categoría que se solapen en fechas.
+   * Sirve para detectar conflictos en la conversión.
+   */
+  function findConflictingBudget(state, category, subcategoryId, startDate, endDate, excludeId) {
+    return state.budgets.find((b) => {
+      if (b.id === excludeId) return false;
+      if (b.category !== category) return false;
+      if ((b.subcategoryId || null) !== (subcategoryId || null)) return false;
+      // Comprobar solapamiento: si no hay start/end en uno o en otro, considerar solape
+      const a1 = startDate ? parseISODate(startDate) : null;
+      const a2 = endDate ? parseISODate(endDate) : null;
+      const b1 = b.startDate ? parseISODate(b.startDate) : null;
+      const b2 = b.endDate ? parseISODate(b.endDate) : null;
+      if (!a1 && !a2) return true; // ambos sin fecha = siempre solapan
+      if (!b1 && !b2) return true;
+      const aS = a1 || new Date(-8640000000000000);
+      const aE = a2 || new Date(8640000000000000);
+      const bS = b1 || new Date(-8640000000000000);
+      const bE = b2 || new Date(8640000000000000);
+      return aS <= bE && bS <= aE;
+    }) || null;
+  }
+
+  // ---------- Formato de moneda ----------
   function formatMoney(amount, currency) {
     const c = currency || 'EUR';
     const symbol = c === 'EUR' ? '€' : c === 'GBP' ? '£' : '$';
@@ -465,14 +659,12 @@
     const abs = Math.abs(fixed);
 
     if (c === 'EUR' || c === 'GBP') {
-      // Estilo europeo: miles con punto, decimales con coma
       const intPart = Math.floor(abs);
       const decPart = Math.round((abs - intPart) * 100);
       const intStr = String(intPart).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
       const decStr = String(decPart).padStart(2, '0');
       return `${sign}${intStr},${decStr} ${symbol}`;
     } else {
-      // Estilo US: miles con coma, decimales con punto
       const intPart = Math.floor(abs);
       const decPart = Math.round((abs - intPart) * 100);
       const intStr = String(intPart).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -486,9 +678,12 @@
     CATEGORIES,
     EXPENSE_TYPES,
     INCOME_TYPES,
+    ICON_OPTIONS,
     newState,
     normalizeExpense,
     normalizeIncome,
+    normalizeSubcategory,
+    normalizeBudget,
     normalizeSettings,
     toISODate,
     parseISODate,
@@ -511,7 +706,18 @@
     isPendingOptional,
     togglePaidMonth,
     toggleSkippedMonth,
+    togglePendingMonth,
+    getPendingMandatory,
     effectiveAmountAt,
+    getSubcategoriesForCategory,
+    getSubcategory,
+    deleteSubcategory,
+    effectiveIconFor,
+    appliesBudgetToMonth,
+    getBudgetsForMonth,
+    getBudgetProgress,
+    summarizeBudgets,
+    findConflictingBudget,
     uuid
   };
 })(window);

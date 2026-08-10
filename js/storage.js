@@ -6,12 +6,8 @@
   'use strict';
 
   const STORAGE_KEY = 'mis-gastos.v1';
-  const SCHEMA_VERSION = 1;
+  const SCHEMA_VERSION = 2;
 
-  /**
-   * Carga el estado desde localStorage. Si no existe, devuelve un estado vacío.
-   * Si existe, normaliza los datos (tolerante a versiones antiguas).
-   */
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -31,6 +27,8 @@
         savedAt: new Date().toISOString(),
         expenses: state.expenses,
         income: state.income,
+        budgets: state.budgets || [],
+        subcategories: state.subcategories || [],
         settings: state.settings
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -52,25 +50,35 @@
   }
 
   /**
-   * Normaliza el estado cargado para garantizar consistencia.
+   * Normaliza el estado cargado para garantizar consistencia y migración.
+   * v1 → v2: añade budgets/subcategories, migra oneTime+variable → unico.
    */
   function migrate(data) {
     const state = Models.newState();
     if (!data || typeof data !== 'object') return state;
 
     if (Array.isArray(data.expenses)) {
-      state.expenses = data.expenses.map((e) => Models.normalizeExpense(e));
+      state.expenses = data.expenses.map((e) => {
+        // Migración: oneTime + variable → unico
+        if (e.oneTime && e.type === 'variable') {
+          return Models.normalizeExpense({ ...e, type: 'unico' });
+        }
+        return Models.normalizeExpense(e);
+      });
     }
     if (Array.isArray(data.income)) {
       state.income = data.income.map((i) => Models.normalizeIncome(i));
+    }
+    if (Array.isArray(data.budgets)) {
+      state.budgets = data.budgets.map((b) => Models.normalizeBudget(b));
+    }
+    if (Array.isArray(data.subcategories)) {
+      state.subcategories = data.subcategories.map((s) => Models.normalizeSubcategory(s));
     }
     state.settings = Models.normalizeSettings(data.settings || {});
     return state;
   }
 
-  /**
-   * Genera un Blob y dispara la descarga de un archivo JSON con todos los datos.
-   */
   function exportJSON(state) {
     const payload = {
       app: 'Mis Gastos',
@@ -78,6 +86,8 @@
       exportedAt: new Date().toISOString(),
       expenses: state.expenses,
       income: state.income,
+      budgets: state.budgets || [],
+      subcategories: state.subcategories || [],
       settings: state.settings
     };
     const json = JSON.stringify(payload, null, 2);
@@ -98,12 +108,6 @@
     return { ok: true, filename, count: state.expenses.length + state.income.length };
   }
 
-  /**
-   * Lee un archivo JSON seleccionado por el usuario y devuelve un estado listo.
-   * Estrategia:
-   *  - 'replace': reemplaza todo el estado
-   *  - 'merge': combina, conservando items por id (los nuevos sobrescriben)
-   */
   function importFromFile(file, mode = 'replace') {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -118,10 +122,21 @@
 
           const newState = Models.newState();
           if (Array.isArray(data.expenses)) {
-            newState.expenses = data.expenses.map((e) => Models.normalizeExpense(e));
+            newState.expenses = data.expenses.map((e) => {
+              if (e.oneTime && e.type === 'variable') {
+                return Models.normalizeExpense({ ...e, type: 'unico' });
+              }
+              return Models.normalizeExpense(e);
+            });
           }
           if (Array.isArray(data.income)) {
             newState.income = data.income.map((i) => Models.normalizeIncome(i));
+          }
+          if (Array.isArray(data.budgets)) {
+            newState.budgets = data.budgets.map((b) => Models.normalizeBudget(b));
+          }
+          if (Array.isArray(data.subcategories)) {
+            newState.subcategories = data.subcategories.map((s) => Models.normalizeSubcategory(s));
           }
           newState.settings = Models.normalizeSettings(data.settings || {});
 
@@ -131,8 +146,14 @@
             newState.expenses.forEach((e) => expMap.set(e.id, e));
             const incMap = new Map(current.income.map((i) => [i.id, i]));
             newState.income.forEach((i) => incMap.set(i.id, i));
+            const budMap = new Map((current.budgets || []).map((b) => [b.id, b]));
+            newState.budgets.forEach((b) => budMap.set(b.id, b));
+            const subMap = new Map((current.subcategories || []).map((s) => [s.id, s]));
+            newState.subcategories.forEach((s) => subMap.set(s.id, s));
             newState.expenses = Array.from(expMap.values());
             newState.income = Array.from(incMap.values());
+            newState.budgets = Array.from(budMap.values());
+            newState.subcategories = Array.from(subMap.values());
           }
 
           resolve(newState);

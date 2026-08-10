@@ -72,6 +72,37 @@
               <span class="summary-value" id="sumBalance">0,00</span>
             </div>
           </div>
+          <div class="summary-card summary-budget">
+            <div class="summary-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+            </div>
+            <div class="summary-info">
+              <span class="summary-label">Retenido</span>
+              <span class="summary-value" id="sumBudget">0,00</span>
+            </div>
+          </div>
+          <div class="summary-card summary-free" id="freeCard">
+            <div class="summary-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div class="summary-info">
+              <span class="summary-label">Libre</span>
+              <span class="summary-value" id="sumFree">0,00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Budgets section -->
+        <div class="section" id="budgetSection">
+          <div class="section-header">
+            <h2 class="section-title">Presupuestos</h2>
+            <button class="text-btn" id="btnNewBudget">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nuevo presupuesto
+            </button>
+          </div>
+          <p class="section-hint">Asigna una cantidad por categoría y se descontará automáticamente con cada gasto que añadas.</p>
+          <div class="items-list" id="budgetList"></div>
         </div>
 
         <!-- Quick add -->
@@ -94,6 +125,16 @@
           </div>
           <p class="section-hint">Estos gastos opcionales pueden aplicarse este mes. Confírmalos si los has pagado.</p>
           <div class="items-list" id="pendingOptionalList"></div>
+        </div>
+
+        <!-- Pending mandatory debts -->
+        <div class="section" id="pendingMandatorySection" style="display:none">
+          <div class="section-header">
+            <h2 class="section-title">Pagos pendientes (deuda)</h2>
+            <span class="section-meta" id="pendingMandatoryCount">0</span>
+          </div>
+          <p class="section-hint">Pagos fijos que dejaste pendientes. Pulsa "Pagar" para cancelar la deuda (sumará al mes actual).</p>
+          <div class="items-list" id="pendingMandatoryList"></div>
         </div>
 
         <!-- Month items -->
@@ -167,6 +208,27 @@
             <div class="empty-state">
               <div class="empty-icon">📅</div>
               <p>Añade gastos o ingresos para ver tu línea de tiempo.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View: Categorías -->
+      <section class="view" data-view="categorias">
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Subcategorías</h2>
+            <button class="text-btn" id="btnNewSubcategory">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nueva
+            </button>
+          </div>
+          <p class="section-hint">Crea subcategorías con su propio icono (ej. Hogar → Comida del hogar, Hogar → Limpieza). Aparecerán al añadir gastos y presupuestos.</p>
+          <div class="items-list" id="subcategoriesList">
+            <div class="empty-state">
+              <div class="empty-icon">🏷️</div>
+              <p>No tienes subcategorías todavía.</p>
+              <p class="empty-hint">Crea tu primera para organizar mejor los gastos de una categoría.</p>
             </div>
           </div>
         </div>
@@ -258,6 +320,16 @@
             </button>
           </div>
 
+          <div class="section-header" style="margin-top:24px">
+            <h2 class="section-title">Gastos desactivados</h2>
+          </div>
+          <p class="section-hint">Gastos que no quieres ver porque ya no los usas (ej. tarjeta liquidada). Pulsa "Reactivar" para volver a verlos.</p>
+          <div class="items-list" id="inactiveExpensesList">
+            <div class="empty-state empty-state-mini">
+              <p>No tienes gastos desactivados.</p>
+            </div>
+          </div>
+
           <div class="about-box">
             <p><strong>Mis Gastos</strong> · v1.0</p>
             <p>Tus datos se guardan solo en este dispositivo. Usa Exportar/Importar para moverlos entre dispositivos.</p>
@@ -283,6 +355,10 @@
       <button class="nav-item" data-nav="historico" role="tab">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>Histórico</span>
+      </button>
+      <button class="nav-item" data-nav="categorias" role="tab">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        <span>Categorías</span>
       </button>
       <button class="nav-item" data-nav="ajustes" role="tab">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -334,14 +410,30 @@
             </div>
           </div>
 
+          <div class="field" id="expenseSubcategoryWrap">
+            <label for="expenseSubcategory">Subcategoría (opcional)</label>
+            <select id="expenseSubcategory">
+              <option value="">— Ninguna —</option>
+            </select>
+            <p class="field-hint" id="expenseSubcategoryHint" style="display:none"></p>
+          </div>
+
+          <div class="field" id="expenseBudgetWrap">
+            <label for="expenseBudget">Presupuesto (opcional)</label>
+            <select id="expenseBudget">
+              <option value="">— Sin asignar —</option>
+            </select>
+            <p class="field-hint">Si lo enlazas, el gasto se descontará de ese presupuesto.</p>
+          </div>
+
           <div class="field">
             <label>Tipo de gasto</label>
-            <div class="segmented" id="expenseTypeSeg">
+            <div class="segmented segmented-3" id="expenseTypeSeg">
               <button type="button" class="seg seg-active" data-type="fixed">Fijo</button>
               <button type="button" class="seg" data-type="temporary">Temporal</button>
-              <button type="button" class="seg" data-type="variable">Variable</button>
+              <button type="button" class="seg" data-type="unico">Único</button>
             </div>
-            <p class="field-hint" id="expenseTypeHint">Se repite cada mes hasta que lo elimines.</p>
+            <p class="field-hint" id="expenseTypeHint">Se repite cada mes hasta que lo elimines. Para compras del día a día vinculadas a un presupuesto, usa el botón "+".</p>
           </div>
 
           <div class="field" id="expenseDateWrap">
@@ -357,27 +449,27 @@
           </div>
 
           <div class="field" id="expenseMonthWrap" style="display:none">
-            <label>Mes específico</label>
+            <label for="expenseMonth">Mes específico</label>
             <input type="month" id="expenseMonth" />
             <p class="field-hint">Para gastos puntuales, como una compra concreta.</p>
           </div>
 
-          <div class="field field-toggle">
+          <div class="field field-toggle" id="expenseOptionalWrap">
             <label class="toggle">
               <input type="checkbox" id="expenseOptional" />
               <span class="toggle-track"></span>
               <span class="toggle-text">Es opcional</span>
             </label>
-            <p class="field-hint">No cuenta hasta que confirmes el mes. Útil para suscripciones que pausas, gastos puntuales o pagos que decides cuándo hacer.</p>
+            <p class="field-hint">No cuenta hasta que confirmes el mes. Útil para suscripciones que pausas o pagos que decides cuándo hacer.</p>
           </div>
 
-          <div class="field field-toggle">
+          <div class="field field-toggle" id="expenseInactiveWrap">
             <label class="toggle">
-              <input type="checkbox" id="expenseOneTime" />
+              <input type="checkbox" id="expenseInactive" />
               <span class="toggle-track"></span>
-              <span class="toggle-text">Pago único</span>
+              <span class="toggle-text">Desactivado</span>
             </label>
-            <p class="field-hint">Solo se paga una vez. Cuando lo confirmes, desaparece de la lista de pendientes.</p>
+            <p class="field-hint">No aparece en ningún mes. Útil cuando ya no usas este gasto (ej. tarjeta liquidada). Puedes reactivarlo desde Ajustes.</p>
           </div>
 
           <div class="field">
@@ -394,6 +486,53 @@
 
           <div class="form-actions">
             <button type="button" class="btn btn-ghost" id="btnDeleteExpense" style="display:none;color:#ef4444">Eliminar</button>
+            <button type="button" class="btn btn-ghost" id="btnConvertToBudget" style="display:none">Convertir en presupuesto</button>
+            <button type="button" class="btn btn-ghost" id="btnConvertToUnico" style="display:none">Convertir a gasto único</button>
+            <button type="submit" class="btn btn-primary btn-grow">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Quick Purchase (linked to budget) -->
+    <div class="modal" id="modalPurchase" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet" role="dialog" aria-labelledby="purchaseTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="purchaseTitle">Añadir gasto</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="formPurchase" class="form">
+          <div class="field">
+            <label for="purchaseName">Concepto</label>
+            <input type="text" id="purchaseName" required maxlength="60" placeholder="Ej. Mercadona, Cena con amigos…" />
+          </div>
+          <div class="field-row">
+            <div class="field field-grow">
+              <label for="purchaseAmount">Importe</label>
+              <input type="number" id="purchaseAmount" required min="0" step="0.01" inputmode="decimal" placeholder="0,00" />
+            </div>
+            <div class="field">
+              <label for="purchaseDate">Fecha</label>
+              <input type="date" id="purchaseDate" />
+            </div>
+          </div>
+          <div class="field" id="purchaseBudgetWrap">
+            <label for="purchaseBudget">Presupuesto</label>
+            <select id="purchaseBudget" required>
+              <option value="">— Selecciona presupuesto —</option>
+            </select>
+            <p class="field-hint">El gasto se descontará automáticamente de este presupuesto.</p>
+          </div>
+          <div class="field" id="purchaseNoBudgetHint" style="display:none">
+            <p class="empty-hint" style="padding:12px;background:var(--warning-soft);border-radius:8px;color:var(--warning)">
+              Aún no tienes presupuestos. Crea uno desde la sección "Presupuestos" del Resumen.
+            </p>
+          </div>
+          <div class="form-actions">
             <button type="submit" class="btn btn-primary btn-grow">Guardar</button>
           </div>
         </form>
@@ -466,6 +605,168 @@
             <button type="submit" class="btn btn-primary btn-grow">Guardar</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Modal: Add/Edit Budget -->
+    <div class="modal" id="modalBudget" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet" role="dialog" aria-labelledby="budgetTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="budgetTitle">Nuevo presupuesto</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="formBudget" class="form">
+          <input type="hidden" id="budgetId" />
+          <div class="field-row">
+            <div class="field field-grow">
+              <label for="budgetAmount">Importe mensual</label>
+              <input type="number" id="budgetAmount" required min="0" step="0.01" inputmode="decimal" placeholder="0,00" />
+            </div>
+            <div class="field">
+              <label>Icono</label>
+              <button type="button" class="icon-picker-btn" id="btnBudgetIcon">
+                <span id="budgetIconPreview">💼</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="budgetCategory">Categoría</label>
+            <select id="budgetCategory" required>
+              <option value="hogar">🏠 Hogar</option>
+              <option value="suscripciones">📺 Suscripciones</option>
+              <option value="transporte">🚗 Transporte</option>
+              <option value="comida">🍔 Comida</option>
+              <option value="salud">💊 Salud</option>
+              <option value="ocio">🎮 Ocio</option>
+              <option value="educacion">📚 Educación</option>
+              <option value="seguros">🛡️ Seguros</option>
+              <option value="deudas">💳 Deudas/Créditos</option>
+              <option value="otros">📦 Otros</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="budgetSubcategory">Subcategoría (opcional)</label>
+            <select id="budgetSubcategory">
+              <option value="">— Todas las de la categoría —</option>
+            </select>
+            <p class="field-hint">Si eliges una subcategoría, el presupuesto solo descuenta gastos de esa subcategoría.</p>
+          </div>
+
+          <div class="field-row">
+            <div class="field field-grow">
+              <label for="budgetStartDate">Fecha de inicio</label>
+              <input type="date" id="budgetStartDate" />
+              <p class="field-hint">Cuándo empieza a contar.</p>
+            </div>
+            <div class="field">
+              <label for="budgetEndDate">Fecha de fin</label>
+              <input type="date" id="budgetEndDate" />
+              <p class="field-hint">Vacío = indefinido.</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="budgetNotes">Notas (opcional)</label>
+            <textarea id="budgetNotes" rows="2" maxlength="200"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" id="btnDeleteBudget" style="display:none;color:#ef4444">Eliminar</button>
+            <button type="submit" class="btn btn-primary btn-grow">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Add/Edit Subcategory -->
+    <div class="modal" id="modalSubcategory" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet" role="dialog" aria-labelledby="subcategoryTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="subcategoryTitle">Nueva subcategoría</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="formSubcategory" class="form">
+          <input type="hidden" id="subcategoryId" />
+          <div class="field">
+            <label for="subcategoryLabel">Nombre</label>
+            <input type="text" id="subcategoryLabel" required maxlength="30" placeholder="Ej. Comida del hogar" />
+          </div>
+          <div class="field-row">
+            <div class="field field-grow">
+              <label for="subcategoryCategory">Categoría padre</label>
+              <select id="subcategoryCategory" required>
+                <option value="hogar">🏠 Hogar</option>
+                <option value="suscripciones">📺 Suscripciones</option>
+                <option value="transporte">🚗 Transporte</option>
+                <option value="comida">🍔 Comida</option>
+                <option value="salud">💊 Salud</option>
+                <option value="ocio">🎮 Ocio</option>
+                <option value="educacion">📚 Educación</option>
+                <option value="seguros">🛡️ Seguros</option>
+                <option value="deudas">💳 Deudas/Créditos</option>
+                <option value="otros">📦 Otros</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Icono</label>
+              <button type="button" class="icon-picker-btn" id="btnSubcategoryIcon">
+                <span id="subcategoryIconPreview">📦</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" id="btnDeleteSubcategory" style="display:none;color:#ef4444">Eliminar</button>
+            <button type="submit" class="btn btn-primary btn-grow">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Budget Conflict -->
+    <div class="modal" id="modalBudgetConflict" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet" role="dialog" aria-labelledby="conflictTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="conflictTitle">Ya existe un presupuesto</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="conflict-body">
+          <p id="conflictInfo">Ya hay un presupuesto para esta categoría. ¿Qué quieres hacer con el importe del gasto que estás convirtiendo?</p>
+          <div class="conflict-actions">
+            <button type="button" class="btn btn-primary" id="conflictReplace">Reemplazar existente</button>
+            <button type="button" class="btn btn-ghost" id="conflictSum">Sumar al existente</button>
+            <button type="button" class="btn btn-ghost" id="conflictCancel" data-close>Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup: Icon picker -->
+    <div class="modal modal-picker" id="iconPickerPopup" aria-hidden="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet modal-sheet-picker" role="dialog" aria-labelledby="pickerTitle">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="pickerTitle">Elige un icono</h2>
+          <button class="icon-btn" data-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="picker-body" id="iconPickerBody"></div>
       </div>
     </div>
 
