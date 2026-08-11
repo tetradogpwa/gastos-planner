@@ -789,7 +789,15 @@
         return;
       }
 
-      // 4) Botones por id (usamos closest para tolerar clicks en SVG/texto interno)
+      // 4) Quick-add del Resumen (data-add="expense|income")
+      const addBtn = t.closest('[data-add]');
+      if (addBtn) {
+        if (addBtn.dataset.add === 'expense') openExpenseForm();
+        else if (addBtn.dataset.add === 'income') openIncomeForm();
+        return;
+      }
+
+      // 5) Botones por id (usamos closest para tolerar clicks en SVG/texto interno)
       const btn = t.closest('button[id]');
       if (!btn) return;
       const id = btn.id;
