@@ -1,11 +1,19 @@
 // Service Worker para Mis Gastos PWA
-const CACHE_NAME = 'mis-gastos-v37';
+// build: 2026-08-11 — toca esta línea en cada release para forzar la reinstalación del SW.
+// (La versión real se lee de version.js; este comentario sólo sirve para que
+// el navegador detecte que el archivo del SW cambió.)
+importScripts('./version.js');
+
+const CACHE_NAME = 'mis-gastos-' + self.APP_VERSION;
 const ASSETS = [
   './',
   './index.html',
+  './version.js',
   './css/styles.css',
   './js/models.js',
   './js/storage.js',
+  './js/actions.js',
+  './js/ui.js',
   './js/app.js',
   './manifest.json',
   './icons/icon-192.png',

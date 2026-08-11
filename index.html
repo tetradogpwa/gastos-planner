@@ -371,7 +371,7 @@
               <div class="app-brand-icon">💰</div>
               <div class="app-brand-info">
                 <div class="app-brand-name">Mis Gastos</div>
-                <div class="app-brand-version">v2.0</div>
+                <div class="app-brand-version" data-app-version></div>
               </div>
             </div>
             <p class="app-brand-desc">Tus datos se guardan solo en este dispositivo. Usa Exportar/Importar para moverlos entre dispositivos.</p>
@@ -386,7 +386,7 @@
     </main>
 
     <div class="app-footer">
-      <a href="https://minimax.io" target="_blank" rel="noopener" class="app-footer-link">Mis Gastos v2.0 · Powered by MiniMax</a>
+      <a href="https://minimax.io" target="_blank" rel="noopener" class="app-footer-link">Mis Gastos <span data-app-version></span> · Powered by MiniMax</a>
     </div>
 
     <!-- Bottom navigation -->
@@ -971,6 +971,7 @@
 
   <input type="file" id="fileImport" accept="application/json,.json" style="display:none" />
 
+  <script src="version.js"></script>
   <script src="js/models.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/actions.js"></script>

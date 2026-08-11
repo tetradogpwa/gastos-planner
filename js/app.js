@@ -660,6 +660,17 @@
     S.save(state);
   }
 
+  // ---------- App version ----------
+  function applyAppVersion() {
+    const v = (typeof self !== 'undefined' && self.APP_VERSION)
+      || (typeof window !== 'undefined' && window.APP_VERSION)
+      || '';
+    if (!v) return;
+    document.querySelectorAll('[data-app-version]').forEach((el) => {
+      el.textContent = v;
+    });
+  }
+
   // ---------- Settings ----------
   function bindSettings() {
     const startDay = $('#settingStartDay');
@@ -889,6 +900,7 @@
 
   // ---------- Init ----------
   function init() {
+    applyAppVersion();
     applyTheme();
     bindEvents();
     bindSettings();
