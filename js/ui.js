@@ -57,7 +57,7 @@
           el('span', { class: 'item-name' }, item.name),
           tag ? el('span', { class: 'item-tag tag-' + tagClass }, tag.tag) : null,
           item.optional ? el('span', { class: 'item-tag tag-optional' }, 'Opcional') : null,
-          item.skippedMonths && item.skippedMonths[M.currentMonthKey && global.__currentMonth]
+          item.skippedMonths && item.skippedMonths[M.__currentMonthKey]
             ? el('span', { class: 'item-tag tag-skipped' }, 'Saltado')
             : null
         ),
@@ -86,7 +86,7 @@
         onclick: (e) => { e.stopPropagation(); M.__onToggleSkipped(item, M.__currentMonthKey); }
       }, '✕'));
     }
-    if (isExpense(item) && (item.type === 'fixed' || item.type === 'temporary')) {
+    if (item._kind === 'expense' && (item.type === 'fixed' || item.type === 'temporary')) {
       wrap.appendChild(el('button', {
         class: 'item-action item-action--pending' +
           (item.pendingMonths && item.pendingMonths[M.__currentMonthKey] ? ' is-pending' : ''),

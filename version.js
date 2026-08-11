@@ -15,7 +15,7 @@
  */
 (function () {
   'use strict';
-  const APP_VERSION = 'v3.0.1';
+  const APP_VERSION = 'v3.0.3';
   const root = typeof self !== 'undefined' ? self : window;
   root.APP_VERSION = APP_VERSION;
 })();

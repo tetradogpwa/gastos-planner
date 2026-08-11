@@ -730,7 +730,30 @@
   function changeMonth(delta) {
     currentMonth = M.addMonths(currentMonth, delta);
     updateMonthLabel();
+    wireModelsBridge();
     render();
+  }
+
+  // ---------- Bridge ui.js ↔ app.js ----------
+  // ui.js pinta los items y, en los botones inline de cada item, llama a
+  // M.__onTogglePaid(item, month) etc. Esos callbacks no existen en models.js;
+  // aquí los colgamos del namespace Models y los refrescamos cuando cambian
+  // currentMonth / currentFilter para que ui.js vea siempre valores válidos.
+  function wireModelsBridge() {
+    if (!M) return;
+    M.__currentMonthKey = currentMonth;
+    M.__currentFilter = currentFilter;
+    M.__onTogglePaid = (item, mk) => togglePaid(item, mk);
+    M.__onToggleSkipped = (item, mk) => toggleSkipped(item, mk);
+    M.__onTogglePending = (item, mk) => togglePending(item, mk);
+    M.__onToggleInactive = (itemId) => toggleInactive(itemId);
+    M.__onTogglePayCC = (cardId) => togglePayCC(cardId);
+    M.__onToggleSkipCC = (cardId) => toggleSkipCC(cardId);
+    M.__onToggleInactiveCC = (cardId) => toggleInactiveCC(cardId);
+    M.__onEditCreditCard = (id) => editCreditCard(id);
+    M.__onUpdateCCBalance = (id) => updateCCBalance(id);
+    M.__onAddExtraPayment = (id) => addExtraPayment(id);
+    M.__onEditSubcategory = (id) => editSubcategory(id);
   }
 
   // ---------- Event wiring ----------
@@ -761,6 +784,7 @@
         $$('#expenseFilters .chip').forEach((x) => x.classList.remove('chip-active'));
         chip.classList.add('chip-active');
         currentFilter = chip.dataset.filter;
+        wireModelsBridge();
         renderAllExpenses();
         return;
       }
@@ -957,6 +981,7 @@
     applyTheme();
     bindEvents();
     bindSettings();
+    wireModelsBridge();
     updateMonthLabel();
     render();
     if ('serviceWorker' in navigator) {
