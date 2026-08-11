@@ -918,11 +918,9 @@
     input.onchange = async (ev) => {
       const file = ev.target.files[0];
       if (!file) return;
+      if (!confirm('¿Reemplazar todos los datos actuales?')) return;
       try {
-        const text = await file.text();
-        const parsed = JSON.parse(text);
-        if (!confirm('¿Reemplazar todos los datos actuales?')) return;
-        const newState = await S.importJSON(parsed);
+        const newState = await S.importFromFile(file, 'replace');
         state = newState;
         persist();
         render();
