@@ -1,10 +1,12 @@
 /* ============================================
    tests/run.js - Test runner minimalista
-   Uso: node tests/run.js
+   Carga los modelos y las acciones en un sandbox, luego corre los tests
+   en un vm.Context con M, A, S disponibles como globales.
    ============================================ */
 
 const path = require('path');
 const fs = require('fs');
+const vm = require('vm');
 
 const tests = [];
 let currentSuite = '';
@@ -45,87 +47,77 @@ function assertThrows(fn, matcher, msg) {
   }
 }
 
+function assertNoThrow(fn, msg) {
+  try { fn(); }
+  catch (e) { throw new Error(`Expected no throw, got: ${e.message}\n  ${msg || ''}`); }
+}
+
 global.suite = suite;
 global.test = test;
 global.assert = assert;
 global.assertEqual = assertEqual;
 global.assertDeepEqual = assertDeepEqual;
 global.assertThrows = assertThrows;
+global.assertNoThrow = assertNoThrow;
 
-// Cargar models y actions para tests
+// Cargar models y actions en un sandbox
 const root = path.resolve(__dirname, '..');
 const sandbox = {};
+
 function loadScript(name) {
   let code = fs.readFileSync(path.join(root, 'js', name), 'utf8');
-  // Convertir IIFE que exporta a window.X → inyectar en sandbox en su lugar
   code = code.replace(/\bwindow\./g, 'sandbox.');
-  // Cambiar nombres de parámetros y referencias
   code = code.replace(/\(function \(\s*global\s*\)\s*\{/, '(function (sandbox) {');
-  code = code.replace(/\}\)\(\s*window\s*\)\s*;?\s*$/, '})(sandbox);');
+  code = code.replace(/\}\)\(\s*window\s*\s*\)\s*;?\s*$/, '})(sandbox);');
   code = code.replace(/\bglobal\.(Models|Storage|Actions|Console)\b/g, 'sandbox.$1');
-
+  code = code.replace(/\bModels\.(normalize|save|load|migrate|export|import|setBalance)/g, 'sandbox.Models.$1');
   const wrapped = `(function() {
-    var sandbox = arguments[0];
-    var window = arguments[0];
-    var document = arguments[1];
-    var localStorage = arguments[2];
-    var crypto = arguments[3];
-    var console = arguments[4];
-    var JSON = arguments[5];
-    var Date = arguments[6];
-    var Math = arguments[7];
-    var Set = arguments[8];
-    var Map = arguments[9];
-    var Object = arguments[10];
-    var Array = arguments[11];
-    var Number = arguments[12];
-    var String = arguments[13];
-    var Boolean = arguments[14];
-    var parseFloat = arguments[15];
-    var parseInt = arguments[16];
-    var isNaN = arguments[17];
-    var setTimeout = arguments[18];
-    var clearTimeout = arguments[19];
+    var sandbox = arguments[0]; var window = arguments[0]; var document = arguments[1]; var localStorage = arguments[2]; var crypto = arguments[3]; var console = arguments[4]; var JSON = arguments[5]; var Date = arguments[6]; var Math = arguments[7]; var Set = arguments[8]; var Map = arguments[9]; var Object = arguments[10]; var Array = arguments[11]; var Number = arguments[12]; var String = arguments[13]; var Boolean = arguments[14]; var parseFloat = arguments[15]; var parseInt = arguments[16]; var isNaN = arguments[17]; var setTimeout = arguments[18]; var clearTimeout = arguments[19];
 ${code}
   })`;
   const fn = eval(wrapped);
   fn(sandbox,
-    {
-      documentElement: { dataset: {} },
-      body: { classList: { add() {}, remove() {}, contains() { return false; } } },
-      readyState: 'complete',
-      addEventListener() {},
-      querySelector: () => null,
-      querySelectorAll: () => [],
-      createElement: () => ({
-        classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-        setAttribute() {}, removeAttribute() {}, addEventListener() {},
-        appendChild() {}, style: {}, dataset: {}, innerHTML: '', textContent: '', value: ''
-      }),
-      createTextNode: () => ({})
-    },
-    {
-      getItem: () => null,
-      setItem() {},
-      removeItem() {}
-    },
+    { documentElement: {}, body: { classList: { add() {}, remove() {}, contains() { return false; } } }, readyState: 'complete', addEventListener() {}, querySelector: () => null, querySelectorAll: () => [], createElement: () => ({ classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } }, setAttribute() {}, removeAttribute() {}, addEventListener() {}, appendChild() {}, style: {}, dataset: {}, innerHTML: '', textContent: '', value: '' }), createTextNode: () => ({}) },
+    { getItem: () => null, setItem() {}, removeItem() {} },
     { randomUUID: () => 'id-' + Math.random() },
     console, JSON, Date, Math, Set, Map, Object, Array, Number, String, Boolean, parseFloat, parseInt, isNaN, setTimeout, clearTimeout);
 }
 
 loadScript('models.js');
 loadScript('actions.js');
+loadScript('storage.js');
 
-global.M = sandbox.Models;
-global.A = sandbox.Actions;
+// Crear un vm.Context con M, A, S disponibles como globales
+const context = vm.createContext({
+  M: sandbox.Models,
+  A: sandbox.Actions,
+  S: sandbox.Storage,
+  suite,
+  test,
+  assert,
+  assertEqual,
+  assertDeepEqual,
+  assertThrows,
+  assertNoThrow,
+  console,
+  require,
+  process
+});
 
-// Cargar tests
-require('./models.test.js');
-require('./actions.test.js');
-require('./creditCards.test.js');
-// require('./balance.test.js'); // DESHABILITADO
+// Cargar tests en el context
+const testFiles = ['./models.test.js', './actions.test.js', './creditCards.test.js', './balance.test.js', './import.test.js'];
 
-// Ejecutar
+for (const file of testFiles) {
+  try {
+    const code = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    vm.runInContext(code, context, { filename: file });
+  } catch (e) {
+    console.error(`Error loading ${file}: ${e.message}`);
+  }
+}
+
+
+// Ejecutar tests
 let passed = 0;
 let failed = 0;
 let currentSuiteName = '';

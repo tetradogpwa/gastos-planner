@@ -2113,9 +2113,8 @@ body.modal-open-body { overflow: hidden; }
 }
 
 /* ============================================
-   Saldo de cuenta (DESHABILITADO)
+   Saldo de cuenta
    ============================================ */
-/*
 .balance-card {
   display: flex;
   flex-direction: column;
@@ -2138,4 +2137,3 @@ body.modal-open-body { overflow: hidden; }
   font-size: 12px;
   color: var(--text-mute);
 }
-*/

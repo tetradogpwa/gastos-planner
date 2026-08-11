@@ -1,5 +1,5 @@
 // Service Worker para Mis Gastos PWA
-const CACHE_NAME = 'mis-gastos-v35';
+const CACHE_NAME = 'mis-gastos-v37';
 const ASSETS = [
   './',
   './index.html',

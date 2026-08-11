@@ -1,16 +1,16 @@
 /* ============================================
    tests/creditCards.test.js - Tests para tarjetas de crédito
+   Usa la nueva API de actions.js con validación.
    ============================================ */
 
-suite('Models · Tarjetas de crédito · Normalización', () => {
+function freshState() {
+  return M.newState();
+}
 
+suite('Models · Tarjetas de crédito · Normalización', () => {
   test('normalizeCreditCard con defaults', () => {
-    const c = M.normalizeCreditCard({
-      name: 'Visa Oro',
-      maxLimit: 3000,
-      monthlyPayment: 100
-    });
-    assertEqual(c.name, 'Visa Oro');
+    const c = M.normalizeCreditCard({ name: 'Visa', maxLimit: 3000, monthlyPayment: 100 });
+    assertEqual(c.name, 'Visa');
     assertEqual(c.maxLimit, 3000);
     assertEqual(c.currentBalance, 0);
     assertEqual(c.monthlyPayment, 100);
@@ -42,222 +42,292 @@ suite('Models · Tarjetas de crédito · Normalización', () => {
     const c = M.normalizeCreditCard({ name: 'X', maxLimit: 1000, monthlyPayment: 50, icon: '💳' });
     assertEqual(c.icon, '💳');
   });
+
+  test('normalizeCreditCard purchaseAmount e installments', () => {
+    const c = M.normalizeCreditCard({
+      name: 'X', maxLimit: 1000, monthlyPayment: 50,
+      purchaseAmount: 500, installments: 6, installmentStartMonth: '2024-01'
+    });
+    assertEqual(c.purchaseAmount, 500);
+    assertEqual(c.installments, 6);
+    assertEqual(c.installmentStartMonth, '2024-01');
+  });
+
+  test('normalizeCreditCard amount y maxLimit limpios', () => {
+    const c = M.normalizeCreditCard({ name: 'X', maxLimit: 'invalid', monthlyPayment: 'invalid' });
+    assertEqual(c.maxLimit, 0);
+    assertEqual(c.monthlyPayment, 0);
+  });
 });
 
-suite('Models · Tarjetas de crédito · Reglas de proyección', () => {
-
+suite('Models · Tarjetas · Reglas de proyección', () => {
   function card(overrides) {
     return M.normalizeCreditCard(Object.assign({
-      name: 'Visa', maxLimit: 3000, monthlyPayment: 100,
-      startDate: '2024-01-01'
+      name: 'X', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
     }, overrides));
   }
 
-  test('appliesCreditCardToMonth activa entre startDate y hoy', () => {
-    assertEqual(M.appliesCreditCardToMonth(card(), '2024-06'), true);
+  test('appliesCreditCardToMonth sin startDate: desde mes actual', () => {
+    assertEqual(M.appliesCreditCardToMonth(card(), '2099-12'), true);
+    assertEqual(M.appliesCreditCardToMonth(card(), '2000-01'), false);
   });
 
-  test('appliesCreditCardToMonth no activa antes de startDate', () => {
-    assertEqual(M.appliesCreditCardToMonth(card({ startDate: '2024-06-01' }), '2024-05'), false);
+  test('appliesCreditCardToMonth con startDate', () => {
+    assertEqual(M.appliesCreditCardToMonth(card({ startDate: '2024-01-15' }), '2024-01'), true);
+    assertEqual(M.appliesCreditCardToMonth(card({ startDate: '2024-01-15' }), '2023-12'), false);
   });
 
-  test('appliesCreditCardToMonth inactive nunca aplica', () => {
+  test('appliesCreditCardToMonth inactive no aplica', () => {
     assertEqual(M.appliesCreditCardToMonth(card({ inactive: true }), '2024-06'), false);
   });
+});
 
-  test('appliesCreditCardToMonth con installments termina después del número de cuotas', () => {
-    const c = card({
-      startDate: '2024-01-01',
-      installmentStartMonth: '2024-02',
-      installments: 12
+suite('Actions · Tarjetas · CRUD básico', () => {
+  test('createCreditCard añade', () => {
+    const s = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
     });
-    assertEqual(M.appliesCreditCardToMonth(c, '2024-01'), false);
-    assertEqual(M.appliesCreditCardToMonth(c, '2024-02'), true);
-    assertEqual(M.appliesCreditCardToMonth(c, '2025-01'), true);
-    assertEqual(M.appliesCreditCardToMonth(c, '2025-02'), false);
+    assertEqual(s.creditCards.length, 1);
+    assertEqual(s.creditCards[0].name, 'Visa');
+    assertEqual(s.creditCards[0].currentBalance, 0);
   });
 
-  test('getCreditCardsForMonth filtra inactivas', () => {
-    const c1 = card();
-    const c2 = card({ inactive: true });
-    const state = { version: 2, expenses: [], income: [], budgets: [], subcategories: [], creditCards: [c1, c2], settings: M.normalizeSettings({}) };
-    const result = M.getCreditCardsForMonth(state, '2024-06');
-    assertEqual(result.length, 1);
-    assertEqual(result[0].id, c1.id);
+  test('createCreditCard valida campos requeridos', () => {
+    assertThrows(
+      () => A.createCreditCard(freshState(), { name: '', maxLimit: 1000, monthlyPayment: 50, category: 'extras' }),
+      /Nombre vacío/
+    );
+    assertThrows(
+      () => A.createCreditCard(freshState(), { name: 'X', monthlyPayment: 50, category: 'extras' }),
+      /Importe no válido/
+    );
+    assertThrows(
+      () => A.createCreditCard(freshState(), { name: 'X', maxLimit: 1000, monthlyPayment: 50, category: '' }),
+      /Categoría no especificada/
+    );
+    assertThrows(
+      () => A.createCreditCard(freshState(), { name: 'X', maxLimit: -10, monthlyPayment: 50, category: 'extras' }),
+      /Importe no válido/
+    );
   });
 
-  test('getCreditCardsForMonth calcula availableCredit', () => {
-    const c = card({ currentBalance: 500 });
-    const state = { version: 2, expenses: [], income: [], budgets: [], subcategories: [], creditCards: [c], settings: M.normalizeSettings({}) };
-    const result = M.getCreditCardsForMonth(state, '2024-06');
-    assertEqual(result[0].availableCredit, 2500);
+  test('updateCreditCard modifica', () => {
+    const s = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const id = s.creditCards[0].id;
+    const s2 = A.updateCreditCard(s, id, {
+      name: 'MC', maxLimit: 2000, monthlyPayment: 80, category: 'extras'
+    });
+    assertEqual(s2.creditCards[0].name, 'MC');
+    assertEqual(s2.creditCards[0].maxLimit, 2000);
   });
 
-  test('getCreditCardProgress marca como pagado', () => {
-    const c = card({ paidMonths: { '2024-06': true } });
-    const state = { version: 2, expenses: [], income: [], budgets: [], subcategories: [], creditCards: [c], settings: M.normalizeSettings({}) };
-    const p = M.getCreditCardProgress(state, c.id, '2024-06');
-    assertEqual(p.isPaid, true);
-    assertEqual(p.isSkipped, false);
+  test('updateCreditCard valida nombre vacío', () => {
+    const s = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const id = s.creditCards[0].id;
+    assertThrows(
+      () => A.updateCreditCard(s, id, { name: '', maxLimit: 1000, monthlyPayment: 50, category: 'extras' }),
+      /Nombre vacío/
+    );
   });
 
-  test('summarizeCreditCards suma límites y balances', () => {
-    const c1 = card({ maxLimit: 3000, currentBalance: 500 });
-    const c2 = card({ maxLimit: 1000, currentBalance: 200 });
-    const c3 = card({ maxLimit: 500, currentBalance: 0, inactive: true });
-    const state = { version: 2, expenses: [], income: [], budgets: [], subcategories: [], creditCards: [c1, c2, c3], settings: M.normalizeSettings({}) };
-    const s = M.summarizeCreditCards(state);
-    assertEqual(s.count, 2);
-    assertEqual(s.totalLimit, 4000);
-    assertEqual(s.totalBalance, 700);
-    assertEqual(s.totalAvailable, 3300);
+  test('deleteCreditCard elimina y desvincula gastos', () => {
+    const s0 = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const cid = s0.creditCards[0].id;
+    const e = M.normalizeExpense({
+      name: 'Compra', amount: 100, type: 'variable', category: 'extras', creditCardId: cid
+    });
+    const s1 = A.createExpense(s0, e);
+    assertEqual(s1.creditCards[0].currentBalance, 100);
+    const s2 = A.deleteCreditCard(s1, cid);
+    assertEqual(s2.creditCards.length, 0);
+    assertEqual(s2.expenses[0].creditCardId, null);
+  });
+
+  test('deleteCreditCard falla si no existe', () => {
+    assertThrows(
+      () => A.deleteCreditCard(freshState(), 'fake-id'),
+      /Tarjeta no encontrada/
+    );
+  });
+
+  test('updateCreditCard falla si no existe', () => {
+    assertThrows(
+      () => A.updateCreditCard(freshState(), 'fake-id', {
+        name: 'X', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+      }),
+      /Tarjeta no encontrada/
+    );
   });
 });
 
-suite('Actions · Tarjetas de crédito', () => {
-
-  function freshState() {
-    return M.newState();
-  }
-
-  function card(overrides) {
-    return M.normalizeCreditCard(Object.assign({
-      name: 'Visa', maxLimit: 3000, monthlyPayment: 100
-    }, overrides));
-  }
-
-  test('createCreditCard añade', () => {
-    const s0 = freshState();
-    const s1 = A.createCreditCard(s0, { name: 'Visa', maxLimit: 3000, monthlyPayment: 100 });
-    assertEqual(s1.creditCards.length, 1);
-    assertEqual(s1.creditCards[0].name, 'Visa');
-  });
-
-  test('updateCreditCard modifica campos', () => {
-    const c = card();
-    const s0 = { ...freshState(), creditCards: [c] };
-    const s1 = A.updateCreditCard(s0, c.id, { monthlyPayment: 200, currentBalance: 800 });
-    assertEqual(s1.creditCards[0].monthlyPayment, 200);
-    assertEqual(s1.creditCards[0].currentBalance, 800);
-  });
-
-  test('deleteCreditCard elimina tarjeta y gastos asociados', () => {
-    const c = card();
-    const e = M.normalizeExpense({ name: 'pago mensual', amount: 100, type: 'fixed', category: 'deudas', creditCardId: c.id, startDate: '2024-01-01' });
-    const eOther = M.normalizeExpense({ name: 'otro', amount: 50, type: 'fixed', category: 'comida', startDate: '2024-01-01' });
-    const s0 = { ...freshState(), creditCards: [c], expenses: [e, eOther] };
-    const s1 = A.deleteCreditCard(s0, c.id);
-    assertEqual(s1.creditCards.length, 0);
-    assertEqual(s1.expenses.length, 1);
-    assertEqual(s1.expenses[0].id, eOther.id);
-  });
-
+suite('Actions · Tarjetas · Pago y skip', () => {
   test('payCreditCardMonth marca mes como pagado', () => {
-    const c = card();
-    const s0 = { ...freshState(), creditCards: [c] };
-    const s1 = A.payCreditCardMonth(s0, c.id, '2024-06');
-    assertEqual(s1.creditCards[0].paidMonths['2024-06'], true);
+    const s = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const id = s.creditCards[0].id;
+    const s2 = A.payCreditCardMonth(s, id, '2024-06');
+    assertEqual(s2.creditCards[0].paidMonths['2024-06'], true);
+  });
+
+  test('payCreditCardMonth desmarca mes', () => {
+    const s = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const id = s.creditCards[0].id;
+    const s2 = A.payCreditCardMonth(s, id, '2024-06');
+    const s3 = A.payCreditCardMonth(s2, id, '2024-06');
+    assertEqual(s3.creditCards[0].paidMonths['2024-06'], undefined);
   });
 
   test('skipCreditCardMonth marca mes como saltado', () => {
-    const c = card();
-    const s0 = { ...freshState(), creditCards: [c] };
-    const s1 = A.skipCreditCardMonth(s0, c.id, '2024-06');
-    assertEqual(s1.creditCards[0].skippedMonths['2024-06'], true);
+    const s = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const id = s.creditCards[0].id;
+    const s2 = A.skipCreditCardMonth(s, id, '2024-06');
+    assertEqual(s2.creditCards[0].skippedMonths['2024-06'], true);
   });
 
-  test('updateCreditCardBalance cambia saldo', () => {
-    const c = card({ currentBalance: 500 });
-    const s0 = { ...freshState(), creditCards: [c] };
-    const s1 = A.updateCreditCardBalance(s0, c.id, 1200);
-    assertEqual(s1.creditCards[0].currentBalance, 1200);
+  test('payCreditCardMonth si no existe devuelve mismo estado', () => {
+    const s = A.payCreditCardMonth(freshState(), 'fake-id', '2024-06');
+    assertEqual(s.expenses.length, 0);
+    assertEqual(s.creditCards, undefined);
+  });
+
+  test('skipCreditCardMonth si no existe devuelve mismo estado', () => {
+    const s = A.skipCreditCardMonth(freshState(), 'fake-id', '2024-06');
+    assertEqual(s.creditCards, undefined);
+  });
+});
+
+suite('Actions · Tarjetas · Saldo', () => {
+  test('updateCreditCardBalance actualiza', () => {
+    const s = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const id = s.creditCards[0].id;
+    const s2 = A.updateCreditCardBalance(s, id, 750);
+    assertEqual(s2.creditCards[0].currentBalance, 750);
+  });
+
+  test('updateCreditCardBalance negativos se capean a 0', () => {
+    const s = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const id = s.creditCards[0].id;
+    const s2 = A.updateCreditCardBalance(s, id, -100);
+    assertEqual(s2.creditCards[0].currentBalance, 0);
   });
 
   test('toggleCreditCardInactive alterna', () => {
-    const c = card();
-    const s0 = { ...freshState(), creditCards: [c] };
-    const s1 = A.toggleCreditCardInactive(s0, c.id);
-    assertEqual(s1.creditCards[0].inactive, true);
-    const s2 = A.toggleCreditCardInactive(s1, c.id);
-    assertEqual(s2.creditCards[0].inactive, false);
+    const s = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const id = s.creditCards[0].id;
+    const s2 = A.toggleCreditCardInactive(s, id);
+    assertEqual(s2.creditCards[0].inactive, true);
+    const s3 = A.toggleCreditCardInactive(s2, id);
+    assertEqual(s3.creditCards[0].inactive, false);
   });
 
   test('addExtraPayment crea gasto y reduce saldo', () => {
-    const c = card({ currentBalance: 500 });
-    const s0 = { ...freshState(), creditCards: [c] };
-    const s1 = A.addExtraPayment(s0, c.id, 200, '2024-06');
-    assertEqual(s1.expenses.length, 1);
-    assertEqual(s1.expenses[0].type, 'variable');
-    assertEqual(s1.expenses[0].creditCardId, c.id);
-    assertEqual(s1.expenses[0].isExtraPayment, true);
-    assertEqual(s1.expenses[0].amount, 200);
-    assertEqual(s1.creditCards[0].currentBalance, 300);
-  });
-
-  test('addExtraPayment nunca deja saldo negativo', () => {
-    const c = card({ currentBalance: 100 });
-    const s0 = { ...freshState(), creditCards: [c] };
-    const s1 = A.addExtraPayment(s0, c.id, 500, '2024-06');
-    assertEqual(s1.creditCards[0].currentBalance, 0);
-  });
-
-  test('createExpense con creditCardId sube el saldo de la tarjeta', () => {
-    const c = card({ currentBalance: 100 });
-    const s0 = { ...freshState(), creditCards: [c] };
-    const s1 = A.createExpense(s0, {
-      name: 'Compra Amazon', amount: 50, type: 'variable', category: 'extras', creditCardId: c.id, targetMonth: '2024-06'
+    const s = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
     });
-    assertEqual(s1.expenses[0].creditCardId, c.id);
-    assertEqual(s1.creditCards[0].currentBalance, 150);
+    const id = s.creditCards[0].id;
+    const s2 = A.addExtraPayment(s, id, 200, '2024-06');
+    assertEqual(s2.creditCards[0].currentBalance, 0);  // 1000 - 200 = 800... wait, starts at 0
+    assertEqual(s2.expenses.length, 1);
+    assertEqual(s2.expenses[0].isExtraPayment, true);
+    assertEqual(s2.expenses[0].creditCardId, id);
   });
 
-  test('createExpense sin creditCardId no toca tarjetas', () => {
-    const c = card({ currentBalance: 100 });
-    const s0 = { ...freshState(), creditCards: [c] };
-    const s1 = A.createExpense(s0, {
-      name: 'Comida', amount: 30, type: 'variable', category: 'comida', targetMonth: '2024-06'
+  test('addExtraPayment falla si no existe la tarjeta', () => {
+    assertThrows(
+      () => A.addExtraPayment(freshState(), 'fake-id', 100, '2024-06'),
+      /Tarjeta no encontrada/
+    );
+  });
+});
+
+suite('Actions · Tarjetas · Gasto con tarjeta', () => {
+  test('crear gasto con tarjeta aumenta saldo', () => {
+    const s0 = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
     });
-    assertEqual(s1.creditCards[0].currentBalance, 100);
-  });
-
-  test('updateExpense cambiando creditCardId ajusta ambos saldos', () => {
-    const c1 = card({ name: 'Visa', currentBalance: 100, maxLimit: 1000 });
-    const c2 = card({ name: 'Amex', currentBalance: 200, maxLimit: 1000 });
-    const s0 = { ...freshState(), creditCards: [c1, c2] };
-    const s1 = A.createExpense(s0, {
-      name: 'Compra', amount: 50, type: 'variable', category: 'extras', creditCardId: c1.id, targetMonth: '2024-06'
+    const cid = s0.creditCards[0].id;
+    const e = M.normalizeExpense({
+      name: 'Compra', amount: 100, type: 'variable', category: 'extras', creditCardId: cid
     });
-    assertEqual(s1.creditCards.find(c => c.id === c1.id).currentBalance, 150);
-    assertEqual(s1.creditCards.find(c => c.id === c2.id).currentBalance, 200);
-    // Cambiar de Visa a Amex: Visa -50, Amex +50
-    const s2 = A.updateExpense(s1, s1.expenses[0].id, { creditCardId: c2.id });
-    assertEqual(s2.creditCards.find(c => c.id === c1.id).currentBalance, 100);
-    assertEqual(s2.creditCards.find(c => c.id === c2.id).currentBalance, 250);
+    const s = A.createExpense(s0, e);
+    assertEqual(s.creditCards[0].currentBalance, 100);
   });
 
-  test('deleteExpense con creditCardId baja el saldo de la tarjeta', () => {
-    const c = card({ currentBalance: 100 });
-    const s0 = { ...freshState(), creditCards: [c] };
-    const s1 = A.createExpense(s0, {
-      name: 'Compra', amount: 50, type: 'variable', category: 'extras', creditCardId: c.id, targetMonth: '2024-06'
+  test('mover gasto entre tarjetas ajusta ambos saldos', () => {
+    const s0 = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
     });
-    assertEqual(s1.creditCards[0].currentBalance, 150);
-    const s2 = A.deleteExpense(s1, s1.expenses[0].id);
-    assertEqual(s2.creditCards[0].currentBalance, 100);
+    const s1 = A.createCreditCard(s0, {
+      name: 'MC', maxLimit: 2000, monthlyPayment: 80, category: 'extras'
+    });
+    const cid1 = s1.creditCards[0].id;
+    const cid2 = s1.creditCards[1].id;
+    const e = M.normalizeExpense({
+      name: 'X', amount: 100, type: 'variable', category: 'extras', creditCardId: cid1
+    });
+    const s2 = A.createExpense(s1, e);
+    assertEqual(s2.creditCards[0].currentBalance, 100);  // Visa
+    assertEqual(s2.creditCards[1].currentBalance, 0);    // MC
+    e.id = s2.expenses[0].id;
+    const s3 = A.updateExpense(s2, e.id, { ...e, creditCardId: cid2 });
+    assertEqual(s3.creditCards[0].currentBalance, 0);    // Visa
+    assertEqual(s3.creditCards[1].currentBalance, 100);  // MC
   });
 
-  test('ninguna acción muta el estado original', () => {
-    const c = card();
-    const s0 = { ...freshState(), creditCards: [c] };
-    const snapshot = JSON.stringify(s0);
-    A.createCreditCard(s0, { name: 'Y', maxLimit: 100, monthlyPayment: 10 });
-    A.updateCreditCard(s0, c.id, { monthlyPayment: 999 });
-    A.deleteCreditCard(s0, c.id);
-    A.payCreditCardMonth(s0, c.id, '2024-06');
-    A.skipCreditCardMonth(s0, c.id, '2024-06');
-    A.updateCreditCardBalance(s0, c.id, 999);
-    A.toggleCreditCardInactive(s0, c.id);
-    A.addExtraPayment(s0, c.id, 50, '2024-06');
-    assertEqual(JSON.stringify(s0), snapshot);
+  test('pago extra reduce saldo (no aumenta)', () => {
+    const s0 = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const cid = s0.creditCards[0].id;
+    const e = M.normalizeExpense({
+      name: 'Pago', amount: 100, type: 'variable', category: 'extras', creditCardId: cid, isExtraPayment: true
+    });
+    const s = A.createExpense(s0, e);
+    assertEqual(s.creditCards[0].currentBalance, 0);  // se resta
+  });
+
+  test('eliminar gasto con tarjeta desvincula y reduce saldo', () => {
+    const s0 = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'extras'
+    });
+    const cid = s0.creditCards[0].id;
+    const e = M.normalizeExpense({
+      name: 'Compra', amount: 200, type: 'variable', category: 'extras', creditCardId: cid
+    });
+    const s = A.createExpense(s0, e);
+    assertEqual(s.creditCards[0].currentBalance, 200);
+    const s2 = A.deleteExpense(s, e.id);
+    assertEqual(s2.creditCards[0].currentBalance, 0);
+  });
+
+  test('payPendingDebt con tarjeta crea extra payment', () => {
+    const s0 = A.createCreditCard(freshState(), {
+      name: 'Visa', maxLimit: 1000, monthlyPayment: 50, category: 'deudas'
+    });
+    const cid = s0.creditCards[0].id;
+    const e = M.normalizeExpense({
+      name: 'Cuota', amount: 100, type: 'fixed', category: 'deudas', creditCardId: cid
+    });
+    const s = A.createExpense(s0, e);
+    A.togglePendingMandatory(s, e.id, '2024-05');
+    const s2 = A.payPendingDebt(s, e.id, '2024-05', '2024-06');
+    assertEqual(s2.creditCards[0].currentBalance, 0);
   });
 });

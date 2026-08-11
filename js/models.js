@@ -248,28 +248,28 @@
       budgets: [],
       subcategories: [],
       creditCards: [],
-      // balanceEntries: [],
+      balanceEntries: [],
       settings: normalizeSettings({})
     };
   }
 
-  // function normalizeBalanceEntry(raw) {
-  //   return {
-  //     id: raw.id || uuid(),
-  //     monthKey: raw.monthKey || todayMonthKey(),
-  //     balance: Number(raw.balance) || 0,
-  //     date: raw.date || new Date().toISOString()
-  //   };
-  // }
+  function normalizeBalanceEntry(raw) {
+    return {
+      id: raw.id || uuid(),
+      monthKey: raw.monthKey || todayMonthKey(),
+      balance: Number(raw.balance) || 0,
+      date: raw.date || new Date().toISOString()
+    };
+  }
 
-  // function getLatestBalance(state, monthKey) {
-  //   if (!state.balanceEntries || state.balanceEntries.length === 0) return null;
-  //   const entries = monthKey
-  //     ? state.balanceEntries.filter((b) => b.monthKey === monthKey)
-  //     : state.balanceEntries;
-  //   if (entries.length === 0) return null;
-  //   return entries[entries.length - 1];
-  // }
+  function getLatestBalance(state, monthKey) {
+    if (!state.balanceEntries || state.balanceEntries.length === 0) return null;
+    const entries = monthKey
+      ? state.balanceEntries.filter((b) => b.monthKey === monthKey)
+      : state.balanceEntries;
+    if (entries.length === 0) return null;
+    return entries[entries.length - 1];
+  }
 
   // ---------- Reglas de proyección ----------
   function appliesToMonth(item, monthKey) {
@@ -838,8 +838,8 @@
     getCreditCardsForMonth,
     getCreditCardProgress,
     summarizeCreditCards,
-    // normalizeBalanceEntry,
-    // getLatestBalance,
+    normalizeBalanceEntry,
+    getLatestBalance,
     uuid
   };
 })(window);

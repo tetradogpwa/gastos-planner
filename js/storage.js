@@ -97,7 +97,7 @@
       budgets: state.budgets || [],
       subcategories: state.subcategories || [],
       creditCards: state.creditCards || [],
-      balanceEntries: state.balanceEntries || [],
+      // balanceEntries: state.balanceEntries || [],
       settings: state.settings
     };
     const json = JSON.stringify(payload, null, 2);

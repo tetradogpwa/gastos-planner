@@ -1,6 +1,7 @@
 /* ============================================
    actions.js - Lógica de negocio PURA
    Todas las funciones reciben `state` y devuelven `state` nuevo.
+   Validación lanza Error, no devuelve success/error.
    No tocan DOM, no leen localStorage, no generan toast.
    ============================================ */
 
@@ -9,7 +10,12 @@
 
   const M = global.Models;
 
+  // ---------- Helpers privados ----------
   const _now = () => new Date().toISOString();
+
+  function _addToList(state, key, item) {
+    return { ...state, [key]: [...state[key], item] };
+  }
 
   function _updateInList(state, key, id, updates) {
     return {
@@ -21,16 +27,151 @@
   }
 
   function _removeFromList(state, key, id) {
-    return { ...state, [key]: state[key].filter((it) => it.id !== id) };
+    return { ...state, [key]: state[key].filter((item) => item.id !== id) };
   }
 
-  function _addToList(state, key, item) {
-    return { ...state, [key]: [...state[key], item] };
+  function _validateExpensePayload(p) {
+    if (!p.name || !p.name.trim()) throw new Error('Concepto vacío');
+    if (p.amount === undefined || p.amount === null || isNaN(p.amount) || p.amount < 0) {
+      throw new Error('Importe no válido');
+    }
+    if (!p.category) throw new Error('Categoría no especificada');
   }
 
-  // ---------- Gastos ----------
+  function _validateIncomePayload(p) {
+    if (!p.name || !p.name.trim()) throw new Error('Concepto vacío');
+    if (p.amount === undefined || p.amount === null || isNaN(p.amount) || p.amount < 0) {
+      throw new Error('Importe no válido');
+    }
+    if (!p.category) throw new Error('Categoría no especificada');
+  }
+
+  function _validateBudgetPayload(p) {
+    if (!p.category) throw new Error('Categoría no especificada');
+    if (p.amount === undefined || p.amount === null || isNaN(p.amount) || p.amount < 0) {
+      throw new Error('Importe no válido');
+    }
+  }
+
+  function _validateSubcategoryPayload(p) {
+    if (!p.label || !p.label.trim()) throw new Error('Nombre vacío');
+    if (!p.category) throw new Error('Categoría no especificada');
+  }
+
+  function _validateCreditCardPayload(p) {
+    if (!p.name || !p.name.trim()) throw new Error('Nombre vacío');
+    if (p.amount === undefined || p.amount === null || isNaN(p.amount) || p.amount < 0) {
+      throw new Error('Importe no válido');
+    }
+    if (!p.category) throw new Error('Categoría no especificada');
+  }
+
+  function _getItem(state, listKey, id) {
+    return state[listKey].find((it) => it.id === id);
+  }
+
+  function _getExpense(state, id) {
+    return _getItem(state, 'expenses', id);
+  }
+  function _getIncome(state, id) {
+    return _getItem(state, 'income', id);
+  }
+  function _getBudget(state, id) {
+    return _getItem(state, 'budgets', id);
+  }
+  function _getSubcategory(state, id) {
+    return _getItem(state, 'subcategories', id);
+  }
+  function _getCreditCard(state, id) {
+    return _getItem(state, 'creditCards', id);
+  }
+
+  // ---------- Saldo a principios de mes ----------
+  function setBalance(state, monthKey, balance) {
+    const newBalance = Number(balance) || 0;
+    const existingEntry = (state.balanceEntries || []).find((b) => b.monthKey === monthKey);
+    let next;
+    if (existingEntry) {
+      next = {
+        ...state,
+        balanceEntries: state.balanceEntries.map((b) =>
+          b.id === existingEntry.id
+            ? { ...b, balance: newBalance, date: _now() }
+            : b
+        )
+      };
+    } else {
+      const entry = M.normalizeBalanceEntry({ monthKey, balance: newBalance });
+      next = _addToList(state, 'balanceEntries', entry);
+    }
+    // Eliminar income "Saldo" preexistente (compatibilidad con versiones anteriores)
+    const oldSaldoIncome = next.income.find(
+      (i) => i.name === 'Saldo' && i.targetMonth === monthKey
+    );
+    if (oldSaldoIncome) {
+      next = {
+        ...next,
+        income: next.income.filter((i) => i.id !== oldSaldoIncome.id)
+      };
+    }
+    return next;
+  }
+
+  // ---------- Gastos (expenses) ----------
+  function createExpense(state, payload) {
+    _validateExpensePayload(payload);
+    const expense = M.normalizeExpense(payload);
+    return _addToList(state, 'expenses', expense);
+  }
+
+  function updateExpense(state, id, payload) {
+    const item = _getExpense(state, id);
+    if (!item) throw new Error('Gasto no encontrado');
+    // Validar el item resultante (merge con existente)
+    _validateExpensePayload({ ...item, ...payload });
+    return _updateInList(state, 'expenses', id, payload);
+  }
+
+  function deleteExpense(state, id) {
+    const item = _getExpense(state, id);
+    if (!item) throw new Error('Gasto no encontrado');
+    let next = _removeFromList(state, 'expenses', id);
+    return _recalcCreditCardBalance(next, item, null);
+  }
+
+  function _recalcCreditCardBalance(state, oldExpense, newExpense) {
+    const oldId = oldExpense && oldExpense.creditCardId;
+    const oldIsExtra = oldExpense && oldExpense.isExtraPayment;
+    const oldAmount = oldExpense ? (oldExpense.amount || 0) : 0;
+    const newId = newExpense && newExpense.creditCardId;
+    const newIsExtra = newExpense && newExpense.isExtraPayment;
+    const newAmount = newExpense ? (newExpense.amount || 0) : 0;
+    let next = state;
+    if (oldId) {
+      const card = next.creditCards.find((c) => c.id === oldId);
+      if (card) {
+        const delta = oldIsExtra ? oldAmount : -oldAmount;
+        const newBal = Math.max(0, card.currentBalance + delta);
+        next = _updateInList(next, 'creditCards', oldId, { currentBalance: newBal });
+      }
+    }
+    if (newId) {
+      const card = next.creditCards.find((c) => c.id === newId);
+      if (card) {
+        const delta = newIsExtra ? -newAmount : newAmount;
+        const newBal = Math.max(0, card.currentBalance + delta);
+        next = _updateInList(next, 'creditCards', newId, { currentBalance: newBal });
+      }
+    }
+    return next;
+  }
+
+  function deleteExpenseBudgetLink(state, id) {
+    return _updateInList(state, 'expenses', id, { budgetId: null });
+  }
+
   function togglePaid(state, itemId, monthKey) {
-    const item = state.expenses.find((e) => e.id === itemId);
+    const item = _getExpense(state, itemId);
     if (!item) return state;
     const newPaidMonths = M.togglePaidMonth(
       item, monthKey, !(item.paidMonths && item.paidMonths[monthKey])
@@ -39,7 +180,7 @@
   }
 
   function toggleSkipped(state, itemId, monthKey) {
-    const item = state.expenses.find((e) => e.id === itemId);
+    const item = _getExpense(state, itemId);
     if (!item) return state;
     const newSkippedMonths = M.toggleSkippedMonth(
       item, monthKey, !(item.skippedMonths && item.skippedMonths[monthKey])
@@ -48,7 +189,7 @@
   }
 
   function togglePendingMandatory(state, itemId, monthKey) {
-    const item = state.expenses.find((e) => e.id === itemId);
+    const item = _getExpense(state, itemId);
     if (!item) return state;
     const wasPending = !!(item.pendingMonths && item.pendingMonths[monthKey]);
     const newPendingMonths = M.togglePendingMonth(item, monthKey, !wasPending);
@@ -62,55 +203,13 @@
   }
 
   function toggleInactive(state, itemId) {
-    const item = state.expenses.find((e) => e.id === itemId);
+    const item = _getExpense(state, itemId);
     if (!item) return state;
     return _updateInList(state, 'expenses', itemId, { inactive: !item.inactive });
   }
 
-  function payPendingDebt(state, itemId, monthKey, currentMonth) {
-    const item = state.expenses.find((e) => e.id === itemId);
-    if (!item) return state;
-    const amount = M.effectiveAmountAt(item, monthKey);
-    const paidMonths = { ...(item.paidMonths || {}) };
-    paidMonths[monthKey] = true;
-    const pendingMonths = { ...(item.pendingMonths || {}) };
-    delete pendingMonths[monthKey];
-    let next = _updateInList(state, 'expenses', itemId, { paidMonths, pendingMonths });
-    const catchUp = M.normalizeExpense({
-      name: item.name + ' (pago de ' + M.monthKeyToShort(monthKey) + ')',
-      amount,
-      type: 'unico',
-      category: item.category,
-      subcategoryId: item.subcategoryId,
-      budgetId: item.budgetId,
-      targetMonth: currentMonth,
-      startDate: M.toISODate(new Date()),
-      notes: 'Liquidación de deuda pendiente'
-    });
-    return _addToList(next, 'expenses', catchUp);
-  }
-
-  function createExpense(state, payload) {
-    const expense = M.normalizeExpense(payload);
-    return _addToList(state, 'expenses', expense);
-  }
-
-  function updateExpense(state, itemId, payload) {
-    const item = state.expenses.find((e) => e.id === itemId);
-    if (!item) return state;
-    return _updateInList(state, 'expenses', itemId, payload);
-  }
-
-  function deleteExpense(state, itemId) {
-    return _removeFromList(state, 'expenses', itemId);
-  }
-
-  function deleteExpenseBudgetLink(state, itemId) {
-    return _updateInList(state, 'expenses', itemId, { budgetId: null });
-  }
-
   function convertExpenseToBudget(state, expenseId, currentMonth) {
-    const expense = state.expenses.find((e) => e.id === expenseId);
+    const expense = _getExpense(state, expenseId);
     if (!expense) return state;
     if (expense.type !== 'fixed' && expense.type !== 'temporary') return state;
     const conflict = M.findConflictingBudget(
@@ -137,16 +236,16 @@
       });
       next = _addToList(state, 'budgets', budget);
     }
-    return _removeFromList(next, 'expenses', expense.id);
+    return _removeFromList(next, 'expenses', expenseId);
   }
 
   function convertExpenseToUnico(state, itemId, currentMonth) {
-    const item = state.expenses.find((e) => e.id === itemId);
+    const item = _getExpense(state, itemId);
     if (!item) return state;
     return _updateInList(state, 'expenses', itemId, {
       type: 'unico',
       targetMonth: currentMonth,
-      startDate: M.toISODate(new Date()),
+      startDate: M.toISODate(M.firstOfMonth(currentMonth)),
       endDate: null,
       oneTime: true,
       optional: false,
@@ -156,98 +255,130 @@
     });
   }
 
-  // ---------- Ingresos ----------
+  function payPendingDebt(state, itemId, monthKey, currentMonth) {
+    const item = _getExpense(state, itemId);
+    if (!item) return state;
+    const amount = M.effectiveAmountAt(item, monthKey);
+    const paidMonths = { ...(item.paidMonths || {}) };
+    paidMonths[monthKey] = true;
+    const pendingMonths = { ...(item.pendingMonths || {}) };
+    delete pendingMonths[monthKey];
+    let next = _updateInList(state, 'expenses', itemId, { paidMonths, pendingMonths });
+    const startDate = M.toISODate(M.firstOfMonth(currentMonth));
+    const catchUp = M.normalizeIncome({
+      name: item.name + ' (pago de ' + M.monthKeyToShort(monthKey) + ')',
+      amount,
+      type: 'extra',
+      category: item.category,
+      targetMonth: currentMonth,
+      startDate,
+      notes: 'Liquidación de deuda pendiente'
+    });
+    next = _addToList(next, 'income', catchUp);
+    return next;
+  }
+
+  // ---------- Ingresos (income) ----------
   function createIncome(state, payload) {
+    _validateIncomePayload(payload);
     const income = M.normalizeIncome(payload);
     return _addToList(state, 'income', income);
   }
 
-  function updateIncome(state, itemId, payload) {
-    const item = state.income.find((i) => i.id === itemId);
-    if (!item) return state;
-    return _updateInList(state, 'income', itemId, payload);
+  function updateIncome(state, id, payload) {
+    const item = _getIncome(state, id);
+    if (!item) throw new Error('Ingreso no encontrado');
+    _validateIncomePayload({ ...item, ...payload });
+    return _updateInList(state, 'income', id, payload);
   }
 
-  function deleteIncome(state, itemId) {
-    return _removeFromList(state, 'income', itemId);
+  function deleteIncome(state, id) {
+    if (!_getIncome(state, id)) throw new Error('Ingreso no encontrado');
+    return _removeFromList(state, 'income', id);
   }
 
-  // ---------- Presupuestos ----------
+  // ---------- Presupuestos (budgets) ----------
   function createBudget(state, payload) {
+    _validateBudgetPayload(payload);
     const budget = M.normalizeBudget(payload);
     return _addToList(state, 'budgets', budget);
   }
 
-  function updateBudget(state, itemId, payload) {
-    const item = state.budgets.find((b) => b.id === itemId);
-    if (!item) return state;
-    return _updateInList(state, 'budgets', itemId, payload);
+  function updateBudget(state, id, payload) {
+    const item = _getBudget(state, id);
+    if (!item) throw new Error('Presupuesto no encontrado');
+    _validateBudgetPayload({ ...item, ...payload });
+    return _updateInList(state, 'budgets', id, payload);
   }
 
-  function deleteBudget(state, itemId) {
-    const next = _removeFromList(state, 'budgets', itemId);
-    // Desvincular gastos que apunten a este presupuesto
-    return {
+  function deleteBudget(state, id) {
+    if (!_getBudget(state, id)) throw new Error('Presupuesto no encontrado');
+    let next = _removeFromList(state, 'budgets', id);
+    next = {
       ...next,
-      expenses: next.expenses.map((e) => e.budgetId === itemId ? { ...e, budgetId: null } : e)
+      expenses: next.expenses.map((e) => e.budgetId === id ? { ...e, budgetId: null } : e)
     };
+    return next;
   }
 
-  // ---------- Subcategorías ----------
+  // ---------- Subcategorías (subcategories) ----------
   function createSubcategory(state, payload) {
+    _validateSubcategoryPayload(payload);
     const sub = M.normalizeSubcategory(payload);
     return _addToList(state, 'subcategories', sub);
   }
 
-  function updateSubcategory(state, itemId, payload) {
-    const item = state.subcategories.find((s) => s.id === itemId);
-    if (!item) return state;
-    return _updateInList(state, 'subcategories', itemId, payload);
+  function updateSubcategory(state, id, payload) {
+    const item = _getSubcategory(state, id);
+    if (!item) throw new Error('Subcategoría no encontrada');
+    _validateSubcategoryPayload({ ...item, ...payload });
+    return _updateInList(state, 'subcategories', id, payload);
   }
 
-  function deleteSubcategory(state, itemId, unlink = true) {
-    const counts = M.deleteSubcategory(state, itemId);
+  function deleteSubcategory(state, id, unlink = true) {
+    if (!_getSubcategory(state, id)) throw new Error('Subcategoría no encontrada');
+    const counts = M.deleteSubcategory(state, id);
     const total = counts.expenseCount + counts.incomeCount + counts.budgetCount;
     if (total > 0 && !unlink) return state;
-    const next = _removeFromList(state, 'subcategories', itemId);
+    let next = _removeFromList(state, 'subcategories', id);
     if (total > 0) {
-      return {
+      next = {
         ...next,
-        expenses: next.expenses.map((e) => e.subcategoryId === itemId ? { ...e, subcategoryId: null } : e),
-        income: next.income.map((i) => i.subcategoryId === itemId ? { ...i, subcategoryId: null } : i),
-        budgets: next.budgets.map((b) => b.subcategoryId === itemId ? { ...b, subcategoryId: null } : b)
+        expenses: next.expenses.map((e) => e.subcategoryId === id ? { ...e, subcategoryId: null } : e),
+        income: next.income.map((i) => i.subcategoryId === id ? { ...i, subcategoryId: null } : i),
+        budgets: next.budgets.map((b) => b.subcategoryId === id ? { ...b, subcategoryId: null } : b)
       };
     }
     return next;
   }
 
-  // ---------- Ajustes ----------
-  function updateSettings(state, updates) {
-    return { ...state, settings: M.normalizeSettings(updates) };
-  }
-
-  // ---------- Tarjetas de crédito ----------
+  // ---------- Tarjetas de crédito (creditCards) ----------
   function createCreditCard(state, payload) {
+    _validateCreditCardPayload(payload);
     const card = M.normalizeCreditCard(payload);
     return _addToList(state, 'creditCards', card);
   }
 
-  function updateCreditCard(state, cardId, payload) {
-    const card = state.creditCards.find((c) => c.id === cardId);
-    if (!card) return state;
-    return _updateInList(state, 'creditCards', cardId, payload);
+  function updateCreditCard(state, id, payload) {
+    const item = _getCreditCard(state, id);
+    if (!item) throw new Error('Tarjeta no encontrada');
+    // Solo validar si el campo está presente
+    if (payload.name !== undefined && !payload.name.trim()) throw new Error('Nombre vacío');
+    return _updateInList(state, 'creditCards', id, payload);
   }
 
-  function deleteCreditCard(state, cardId) {
-    const next = _removeFromList(state, 'creditCards', cardId);
-    return {
+  function deleteCreditCard(state, id) {
+    if (!_getCreditCard(state, id)) throw new Error('Tarjeta no encontrada');
+    let next = _removeFromList(state, 'creditCards', id);
+    next = {
       ...next,
-      expenses: next.expenses.filter((e) => e.creditCardId !== cardId)
+      expenses: next.expenses.map((e) => e.creditCardId === id ? { ...e, creditCardId: null } : e)
     };
+    return next;
   }
 
   function payCreditCardMonth(state, cardId, monthKey) {
-    const card = state.creditCards.find((c) => c.id === cardId);
+    const card = _getCreditCard(state, cardId);
     if (!card) return state;
     const paidMonths = { ...(card.paidMonths || {}) };
     paidMonths[monthKey] = true;
@@ -255,70 +386,28 @@
   }
 
   function skipCreditCardMonth(state, cardId, monthKey) {
-    const card = state.creditCards.find((c) => c.id === cardId);
+    const card = _getCreditCard(state, cardId);
     if (!card) return state;
     const skippedMonths = { ...(card.skippedMonths || {}) };
     skippedMonths[monthKey] = true;
     return _updateInList(state, 'creditCards', cardId, { skippedMonths });
   }
 
-  function updateCreditCardBalance(state, cardId, newBalance) {
-    const card = state.creditCards.find((c) => c.id === cardId);
+  function updateCreditCardBalance(state, cardId, balance) {
+    const card = _getCreditCard(state, cardId);
     if (!card) return state;
-    return _updateInList(state, 'creditCards', cardId, { currentBalance: Number(newBalance) || 0 });
+    return _updateInList(state, 'creditCards', cardId, { currentBalance: Number(balance) || 0 });
   }
-
-  // ---------- Saldo a principios de mes (DESHABILITADO) ----------
-  /*
-  // El saldo es el saldo inicial del mes. Se guarda en `balanceEntries`.
-  // NO se añade como income (es el punto de partida, no un income adicional).
-  function setBalance(state, monthKey, balance) {
-    const newBalance = Number(balance) || 0;
-
-    // 1. Actualizar o crear la entrada de saldo (una sola por mes)
-    const existingEntry = (state.balanceEntries || []).find(
-      (b) => b.monthKey === monthKey
-    );
-    let next;
-    if (existingEntry) {
-      next = {
-        ...state,
-        balanceEntries: state.balanceEntries.map((b) =>
-          b.id === existingEntry.id
-            ? { ...b, balance: newBalance, date: new Date().toISOString() }
-            : b
-        )
-      };
-    } else {
-      const entry = M.normalizeBalanceEntry({ monthKey, balance: newBalance });
-      next = _addToList(state, 'balanceEntries', entry);
-    }
-
-    // 2. Si ya existía un ingreso "Saldo" (versión anterior), eliminarlo
-    // para evitar el doble-conteo (el Saldo ahora es solo el saldo inicial)
-    const oldSaldoIncome = next.income.find(
-      (i) => i.name === 'Saldo' && i.targetMonth === monthKey
-    );
-    if (oldSaldoIncome) {
-      next = {
-        ...next,
-        income: next.income.filter((i) => i.id !== oldSaldoIncome.id)
-      };
-    }
-
-    return next;
-  }
-  */
 
   function toggleCreditCardInactive(state, cardId) {
-    const card = state.creditCards.find((c) => c.id === cardId);
+    const card = _getCreditCard(state, cardId);
     if (!card) return state;
     return _updateInList(state, 'creditCards', cardId, { inactive: !card.inactive });
   }
 
   function addExtraPayment(state, cardId, amount, monthKey) {
-    const card = state.creditCards.find((c) => c.id === cardId);
-    if (!card) return state;
+    const card = _getCreditCard(state, cardId);
+    if (!card) throw new Error('Tarjeta no encontrada');
     const today = M.toISODate(new Date());
     const extraExpense = M.normalizeExpense({
       name: card.name + ' (pago extra)',
@@ -332,66 +421,15 @@
       notes: 'Pago extra a tarjeta'
     });
     const newBalance = Math.max(0, card.currentBalance - (Number(amount) || 0));
-    const next = _addToList(state, 'expenses', extraExpense);
+    let next = _addToList(state, 'expenses', extraExpense);
     return _updateInList(next, 'creditCards', cardId, { currentBalance: newBalance });
   }
 
-  // Cuando un gasto se vincula/desvincula de una tarjeta, ajusta el saldo de la tarjeta
-  // (las compras con tarjeta suben la deuda; los pagos extra la bajan).
-  function _recalcCreditCardBalance(state, oldExpense, newExpense) {
-    const oldId = oldExpense && oldExpense.creditCardId;
-    const oldIsExtra = oldExpense && oldExpense.isExtraPayment;
-    const oldAmount = oldExpense ? (oldExpense.amount || 0) : 0;
-    const newId = newExpense && newExpense.creditCardId;
-    const newIsExtra = newExpense && newExpense.isExtraPayment;
-    const newAmount = newExpense ? (newExpense.amount || 0) : 0;
-    let next = state;
-    // Desvincular del anterior: si era compra la deuda baja, si era pago extra la deuda sube
-    if (oldId) {
-      const card = next.creditCards.find((c) => c.id === oldId);
-      if (card) {
-        const delta = oldIsExtra ? oldAmount : -oldAmount;
-        const newBal = Math.max(0, card.currentBalance + delta);
-        next = _updateInList(next, 'creditCards', oldId, { currentBalance: newBal });
-      }
-    }
-    // Vincular al nuevo: si es compra la deuda sube, si es pago extra la deuda baja
-    if (newId) {
-      const card = next.creditCards.find((c) => c.id === newId);
-      if (card) {
-        const delta = newIsExtra ? -newAmount : newAmount;
-        const newBal = Math.max(0, card.currentBalance + delta);
-        next = _updateInList(next, 'creditCards', newId, { currentBalance: newBal });
-      }
-    }
-    return next;
+  // ---------- Configuración y datos ----------
+  function updateSettings(state, updates) {
+    return { ...state, settings: M.normalizeSettings(updates) };
   }
 
-  function createExpense(state, payload) {
-    const expense = M.normalizeExpense(payload);
-    let next = _addToList(state, 'expenses', expense);
-    return _recalcCreditCardBalance(next, null, expense);
-  }
-
-  function updateExpense(state, itemId, payload) {
-    const item = state.expenses.find((e) => e.id === itemId);
-    if (!item) return state;
-    const oldItem = { ...item };
-    const updated = M.normalizeExpense({ ...item, ...payload });
-    let next = _updateInList(state, 'expenses', itemId, { ...payload, updatedAt: new Date().toISOString() });
-    // Normalizar el item actualizado para recálculo
-    const updatedNormalized = M.normalizeExpense({ ...item, ...payload });
-    return _recalcCreditCardBalance(next, oldItem, updatedNormalized);
-  }
-
-  function deleteExpense(state, itemId) {
-    const item = state.expenses.find((e) => e.id === itemId);
-    if (!item) return state;
-    let next = _removeFromList(state, 'expenses', itemId);
-    return _recalcCreditCardBalance(next, item, null);
-  }
-
-  // ---------- Datos ----------
   function resetState() {
     return M.newState();
   }
@@ -443,9 +481,9 @@
       imported.expenses.forEach((e) => expMap.set(e.id, e));
       const incMap = new Map(state.income.map((i) => [i.id, i]));
       imported.income.forEach((i) => incMap.set(i.id, i));
-      const budMap = new Map(state.budgets.map((b) => [b.id, b]));
+      const budMap = new Map((state.budgets || []).map((b) => [b.id, b]));
       imported.budgets.forEach((b) => budMap.set(b.id, b));
-      const subMap = new Map(state.subcategories.map((s) => [s.id, s]));
+      const subMap = new Map((state.subcategories || []).map((s) => [s.id, s]));
       imported.subcategories.forEach((s) => subMap.set(s.id, s));
       return {
         ...state,
@@ -459,17 +497,31 @@
     return imported;
   }
 
+  // ---------- API pública ----------
   global.Actions = {
+    // Saldo
+    setBalance,
+
+    // Gastos
+    createExpense, updateExpense, deleteExpense, deleteExpenseBudgetLink,
     togglePaid, toggleSkipped, togglePendingMandatory, toggleInactive,
-    payPendingDebt, createExpense, updateExpense, deleteExpense, deleteExpenseBudgetLink,
-    convertExpenseToBudget, convertExpenseToUnico,
+    convertExpenseToBudget, convertExpenseToUnico, payPendingDebt,
+
+    // Ingresos
     createIncome, updateIncome, deleteIncome,
+
+    // Presupuestos
     createBudget, updateBudget, deleteBudget,
+
+    // Subcategorías
     createSubcategory, updateSubcategory, deleteSubcategory,
+
+    // Tarjetas
     createCreditCard, updateCreditCard, deleteCreditCard,
     payCreditCardMonth, skipCreditCardMonth, updateCreditCardBalance,
     toggleCreditCardInactive, addExtraPayment,
-    // setBalance,
+
+    // Config / Datos
     updateSettings, resetState, seedExampleData, applyImport
   };
 })(window);
