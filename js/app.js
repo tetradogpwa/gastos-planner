@@ -734,144 +734,175 @@
   }
 
   // ---------- Event wiring ----------
+  // Usamos delegación de eventos en `document`. Así, aunque `render()`
+  // destruya y vuelva a crear botones (p.ej. btnUpdateBalance, btnNewBudget),
+  // los handlers siguen funcionando. También evita fallos si un elemento aún
+  // no existe al cargar (p.ej. #btnCreditCardIcon, que no está en el modal
+  // de tarjeta pero estaba siendo enlazado).
   function bindEvents() {
-    document.querySelectorAll('.nav-item').forEach((n) => {
-      n.addEventListener('click', () => setView(n.dataset.nav));
-    });
-    $('#btnPrevMonth').addEventListener('click', () => changeMonth(-1));
-    $('#btnNextMonth').addEventListener('click', () => changeMonth(1));
-    $('#currentMonthPill').addEventListener('click', () => {
-      currentMonth = M.todayMonthKey();
-      updateMonthLabel();
-      render();
-    });
-    $('#fabAdd').addEventListener('click', () => openExpenseForm());
-
-    $('#btnNewExpense').addEventListener('click', () => openExpenseForm());
-    $('#btnNewIncome').addEventListener('click', () => openIncomeForm());
-    $('#btnNewBudget').addEventListener('click', () => openBudgetForm());
-    $('#btnNewSubcategory').addEventListener('click', () => openSubcategoryForm());
-    $('#btnNewCreditCard').addEventListener('click', () => openCreditCardForm());
-
-    $('#formExpense').addEventListener('submit', submitExpenseForm);
-    $('#formIncome').addEventListener('submit', submitIncomeForm);
-    $('#formBudget').addEventListener('submit', submitBudgetForm);
-    $('#formSubcategory').addEventListener('submit', submitSubcategoryForm);
-    $('#formCreditCard').addEventListener('submit', submitCreditCardForm);
-
-    $('#btnDeleteExpense').addEventListener('click', () => {
-      const id = $('#expenseId').value;
-      if (id && confirm('¿Eliminar este gasto?')) {
-        try { state = A.deleteExpense(state, id); persist(); closeModal('modalExpense'); render(); toast('Gasto eliminado'); }
-        catch (e) { toast(e.message); }
-      }
-    });
-    $('#btnConvertToBudget').addEventListener('click', () => {
-      const id = $('#expenseId').value;
-      if (id) openConvertToBudget(id);
-    });
-    $('#btnConvertToUnico').addEventListener('click', () => {
-      const id = $('#expenseId').value;
-      if (id) openConvertToUnico(id);
-    });
-    $('#btnDeleteIncome').addEventListener('click', () => {
-      const id = $('#incomeId').value;
-      if (id && confirm('¿Eliminar este ingreso?')) {
-        try { state = A.deleteIncome(state, id); persist(); closeModal('modalIncome'); render(); toast('Ingreso eliminado'); }
-        catch (e) { toast(e.message); }
-      }
-    });
-    $('#btnDeleteBudget').addEventListener('click', () => {
-      const id = $('#budgetId').value;
-      if (id && confirm('¿Eliminar este presupuesto?')) {
-        try { state = A.deleteBudget(state, id); persist(); closeModal('modalBudget'); render(); toast('Presupuesto eliminado'); }
-        catch (e) { toast(e.message); }
-      }
-    });
-    $('#btnDeleteSubcategory').addEventListener('click', () => {
-      const id = $('#subcategoryId').value;
-      if (id) {
-        const counts = M.deleteSubcategory(state, id);
-        const total = counts.expenseCount + counts.incomeCount + counts.budgetCount;
-        const msg = total > 0
-          ? `Esta subcategoría está usada en ${total} movimiento(s). Se desvinculará pero no se borrarán. ¿Continuar?`
-          : '¿Eliminar esta subcategoría?';
-        if (confirm(msg)) {
-          try { state = A.deleteSubcategory(state, id, true); persist(); closeModal('modalSubcategory'); render(); toast('Subcategoría eliminada'); }
-          catch (e) { toast(e.message); }
-        }
-      }
-    });
-    $('#btnDeleteCreditCard').addEventListener('click', () => {
-      const id = $('#creditCardId').value;
-      if (id && confirm('¿Eliminar esta tarjeta? También se desvincularán los gastos.')) {
-        try { state = A.deleteCreditCard(state, id); persist(); closeModal('modalCreditCard'); render(); toast('Tarjeta eliminada'); }
-        catch (e) { toast(e.message); }
-      }
-    });
-
-    // Filtros
-    $$('#expenseFilters .chip').forEach((c) => {
-      c.addEventListener('click', () => {
-        $$('#expenseFilters .chip').forEach((x) => x.classList.remove('chip-active'));
-        c.classList.add('chip-active');
-        currentFilter = c.dataset.filter;
-        renderAllExpenses();
-      });
-    });
-
-    // Saldo
-    $('#btnUpdateBalance').addEventListener('click', openSetBalanceModal);
-    $('#formSetBalance').addEventListener('submit', submitSetBalance);
-    $('#formUpdateBalance').addEventListener('submit', submitUpdateBalance);
-    $('#formExtraPayment').addEventListener('submit', submitExtraPayment);
-
-    // Icon picker
-    $('#btnBudgetIcon').addEventListener('click', () => openIconPicker('budget'));
-    $('#btnSubcategoryIcon').addEventListener('click', () => openIconPicker('subcategory'));
-    $('#btnCreditCardIcon').addEventListener('click', () => openIconPicker('creditcard'));
-
-    // Datos
-    $('#btnExport').addEventListener('click', () => { S.exportJSON(state); toast('Exportado'); });
-    $('#btnImport').addEventListener('click', () => {
-      $('#fileImport').value = '';
-      $('#fileImport').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        try {
-          const text = await file.text();
-          const parsed = JSON.parse(text);
-          if (!confirm('¿Reemplazar todos los datos actuales?')) return;
-          const newState = await S.importJSON(parsed);
-          state = newState;
-          persist();
-          render();
-          toast('Importado');
-        } catch (err) {
-          toast('Error: ' + err.message);
-        }
-      };
-      $('#fileImport').click();
-    });
-    $('#btnSeed').addEventListener('click', () => {
-      if (!confirm('Esto añadirá datos de ejemplo. ¿Continuar?')) return;
-      try { state = A.seedExampleData(state); persist(); render(); toast('Datos cargados'); }
-      catch (e) { toast(e.message); }
-    });
-    $('#btnReset').addEventListener('click', () => {
-      if (!confirm('¿Borrar TODOS los datos?')) return;
-      if (!confirm('¿Seguro? Se perderán gastos, ingresos, etc.')) return;
-      try { state = A.resetState(); persist(); render(); toast('Datos borrados'); }
-      catch (e) { toast(e.message); }
-    });
-
-    // Modal close (backdrop)
     document.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-close]');
+      const t = e.target;
+
+      // 1) Cierre de modal (data-close)
+      const closeBtn = t.closest('[data-close]');
+      if (closeBtn) {
+        const modal = closeBtn.closest('.modal');
+        if (modal) UI.closeModal(modal.id);
+        return;
+      }
+
+      // 2) Navegación inferior
+      const nav = t.closest('.nav-item');
+      if (nav) { setView(nav.dataset.nav); return; }
+
+      // 3) Chips de filtro en Gastos
+      const chip = t.closest('#expenseFilters .chip');
+      if (chip) {
+        $$('#expenseFilters .chip').forEach((x) => x.classList.remove('chip-active'));
+        chip.classList.add('chip-active');
+        currentFilter = chip.dataset.filter;
+        renderAllExpenses();
+        return;
+      }
+
+      // 4) Botones por id (usamos closest para tolerar clicks en SVG/texto interno)
+      const btn = t.closest('button[id]');
       if (!btn) return;
-      const modal = btn.closest('.modal');
-      if (modal) UI.closeModal(modal.id);
+      const id = btn.id;
+
+      switch (id) {
+        case 'btnPrevMonth': changeMonth(-1); return;
+        case 'btnNextMonth': changeMonth(1); return;
+        case 'currentMonthPill':
+          currentMonth = M.todayMonthKey();
+          updateMonthLabel();
+          render();
+          return;
+
+        case 'fabAdd':
+        case 'btnNewExpense':
+          openExpenseForm(); return;
+
+        case 'btnNewIncome':
+          openIncomeForm(); return;
+        case 'btnNewBudget':
+          openBudgetForm(); return;
+        case 'btnNewSubcategory':
+          openSubcategoryForm(); return;
+        case 'btnNewCreditCard':
+          openCreditCardForm(); return;
+
+        case 'btnUpdateBalance':
+          openSetBalanceModal(); return;
+
+        case 'btnBudgetIcon':
+        case 'btnSubcategoryIcon':
+        case 'btnCreditCardIcon':
+          // Sólo abrimos el picker si el botón realmente existe en el DOM;
+          // así evitamos depender de elementos que no estén en su modal.
+          if ($('#' + id)) openIconPicker(id.replace('btn', '').replace('Icon', '').toLowerCase());
+          return;
+
+        case 'btnDeleteExpense': {
+          const eid = $('#expenseId').value;
+          if (eid && confirm('¿Eliminar este gasto?')) {
+            try { state = A.deleteExpense(state, eid); persist(); closeModal('modalExpense'); render(); toast('Gasto eliminado'); }
+            catch (err) { toast(err.message); }
+          }
+          return;
+        }
+        case 'btnConvertToBudget': {
+          const eid = $('#expenseId').value;
+          if (eid) openConvertToBudget(eid);
+          return;
+        }
+        case 'btnConvertToUnico': {
+          const eid = $('#expenseId').value;
+          if (eid) openConvertToUnico(eid);
+          return;
+        }
+        case 'btnDeleteIncome': {
+          const iid = $('#incomeId').value;
+          if (iid && confirm('¿Eliminar este ingreso?')) {
+            try { state = A.deleteIncome(state, iid); persist(); closeModal('modalIncome'); render(); toast('Ingreso eliminado'); }
+            catch (err) { toast(err.message); }
+          }
+          return;
+        }
+        case 'btnDeleteBudget': {
+          const bid = $('#budgetId').value;
+          if (bid && confirm('¿Eliminar este presupuesto?')) {
+            try { state = A.deleteBudget(state, bid); persist(); closeModal('modalBudget'); render(); toast('Presupuesto eliminado'); }
+            catch (err) { toast(err.message); }
+          }
+          return;
+        }
+        case 'btnDeleteSubcategory': {
+          const sid = $('#subcategoryId').value;
+          if (sid) {
+            const counts = M.deleteSubcategory(state, sid);
+            const total = counts.expenseCount + counts.incomeCount + counts.budgetCount;
+            const msg = total > 0
+              ? `Esta subcategoría está usada en ${total} movimiento(s). Se desvinculará pero no se borrarán. ¿Continuar?`
+              : '¿Eliminar esta subcategoría?';
+            if (confirm(msg)) {
+              try { state = A.deleteSubcategory(state, sid, true); persist(); closeModal('modalSubcategory'); render(); toast('Subcategoría eliminada'); }
+              catch (err) { toast(err.message); }
+            }
+          }
+          return;
+        }
+        case 'btnDeleteCreditCard': {
+          const cid = $('#creditCardId').value;
+          if (cid && confirm('¿Eliminar esta tarjeta? También se desvincularán los gastos.')) {
+            try { state = A.deleteCreditCard(state, cid); persist(); closeModal('modalCreditCard'); render(); toast('Tarjeta eliminada'); }
+            catch (err) { toast(err.message); }
+          }
+          return;
+        }
+
+        case 'btnExport':
+          S.exportJSON(state);
+          toast('Exportado');
+          return;
+        case 'btnImport':
+          triggerImport();
+          return;
+        case 'btnSeed':
+          if (!confirm('Esto añadirá datos de ejemplo. ¿Continuar?')) return;
+          try { state = A.seedExampleData(state); persist(); render(); toast('Datos cargados'); }
+          catch (err) { toast(err.message); }
+          return;
+        case 'btnReset':
+          if (!confirm('¿Borrar TODOS los datos?')) return;
+          if (!confirm('¿Seguro? Se perderán gastos, ingresos, etc.')) return;
+          try { state = A.resetState(); persist(); render(); toast('Datos borrados'); }
+          catch (err) { toast(err.message); }
+          return;
+      }
     });
+
+    // Submit de formularios (delegación)
+    document.addEventListener('submit', (e) => {
+      const form = e.target;
+      if (!form || !form.id) return;
+      switch (form.id) {
+        case 'formExpense':        submitExpenseForm(e); break;
+        case 'formIncome':         submitIncomeForm(e); break;
+        case 'formBudget':         submitBudgetForm(e); break;
+        case 'formSubcategory':    submitSubcategoryForm(e); break;
+        case 'formCreditCard':     submitCreditCardForm(e); break;
+        case 'formSetBalance':     submitSetBalance(e); break;
+        case 'formUpdateBalance':  submitUpdateBalance(e); break;
+        case 'formExtraPayment':   submitExtraPayment(e); break;
+        default:
+          // Formularios no manejados: prevenimos el submit por defecto
+          // para evitar recargas accidentales de la página.
+          e.preventDefault();
+      }
+    });
+
+    // Escape para cerrar el modal superior
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         const open = $$('.modal.modal-open');
@@ -880,12 +911,36 @@
     });
   }
 
+  function triggerImport() {
+    const input = $('#fileImport');
+    if (!input) return;
+    input.value = '';
+    input.onchange = async (ev) => {
+      const file = ev.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!confirm('¿Reemplazar todos los datos actuales?')) return;
+        const newState = await S.importJSON(parsed);
+        state = newState;
+        persist();
+        render();
+        toast('Importado');
+      } catch (err) {
+        toast('Error: ' + err.message);
+      }
+    };
+    input.click();
+  }
+
   function openIconPicker(context) {
     const preview = $('#' + context + 'IconPreview');
+    if (!preview) return;
     const current = preview.textContent.trim();
-    UI.el.exposed_openIconPicker && UI.el.exposed_openIconPicker(current, (icon) => {
-      preview.textContent = icon;
-    });
+    if (UI.el && UI.el.exposed_openIconPicker) {
+      UI.el.exposed_openIconPicker(current, (icon) => { preview.textContent = icon; });
+    }
   }
 
   // ---------- Views ----------
