@@ -40,12 +40,23 @@
     };
   }
 
+  function readAmountHistoryFromList(listSelector) {
+    const rows = $$(listSelector + ' .amount-history-item');
+    return rows
+      .map((li) => {
+        const dateInput = li.querySelector('.amount-history-date');
+        const amountInput = li.querySelector('.amount-history-amount');
+        const dateVal = dateInput ? (dateInput.value || dateInput.textContent || '').trim() : '';
+        const amountVal = amountInput ? (amountInput.value || amountInput.textContent || '') : '';
+        const amount = parseFloat(String(amountVal).replace(',', '.'));
+        if (!dateVal || isNaN(amount)) return null;
+        return { fromDate: dateVal, amount };
+      })
+      .filter(Boolean);
+  }
+
   function readExpenseAmountHistory() {
-    const rows = $$('#expenseAmountHistory .amount-history-item');
-    return rows.map((li) => ({
-      fromDate: li.querySelector('.amount-history-date').textContent,
-      amount: parseFloat(li.querySelector('.amount-history-amount').textContent.replace(',', '.'))
-    }));
+    return readAmountHistoryFromList('#expenseAmountHistory');
   }
 
   function readIncomeForm() {
@@ -53,7 +64,7 @@
       name: $('#incomeName').value.trim(),
       amount: parseFloat($('#incomeAmount').value),
       type: $('#incomeTypeSeg .seg-active').dataset.type,
-      category: $('#incomeCategory').value,
+      category: 'nomina',
       startDate: $('#incomeStartDate').value,
       endDate: $('#incomeEndDate').value || null,
       targetMonth: $('#incomeTypeSeg .seg-active').dataset.type === 'extra' ? $('#incomeMonth').value : null,
@@ -62,11 +73,7 @@
   }
 
   function readIncomeAmountHistory() {
-    const rows = $$('#incomeAmountHistory .amount-history-item');
-    return rows.map((li) => ({
-      fromDate: li.querySelector('.amount-history-date').textContent,
-      amount: parseFloat(li.querySelector('.amount-history-amount').textContent.replace(',', '.'))
-    }));
+    return readAmountHistoryFromList('#incomeAmountHistory');
   }
 
   function readBudgetForm() {
@@ -137,22 +144,43 @@
     $('#expenseNotes').value = item.notes || '';
     $('#expenseMonth').value = item.targetMonth || '';
     UI.el.exposed_setExpenseType && UI.el.exposed_setExpenseType(item.type || 'fixed');
+    UI.el.exposed_fillExpenseCategorySelectors && UI.el.exposed_fillExpenseCategorySelectors(item.category);
+    fillAmountHistoryList('#expenseAmountHistory', item.amountHistory);
   }
 
   function fillIncomeForm(item) {
     $('#incomeId').value = item.id;
     $('#incomeName').value = item.name;
     $('#incomeAmount').value = item.amount;
-    $('#incomeCategory').value = item.category;
     $('#incomeStartDate').value = item.startDate || '';
     $('#incomeEndDate').value = item.endDate || '';
     $('#incomeMonth').value = item.targetMonth || '';
     UI.el.exposed_setIncomeType && UI.el.exposed_setIncomeType(item.type || 'recurring');
+    fillAmountHistoryList('#incomeAmountHistory', item.amountHistory);
+  }
+
+  function fillAmountHistoryList(listSelector, history) {
+    const list = $(listSelector);
+    if (!list) return;
+    list.innerHTML = '';
+    if (!Array.isArray(history)) return;
+    history.forEach((h) => {
+      if (!h || !h.fromDate) return;
+      const li = document.createElement('li');
+      li.className = 'amount-history-item';
+      li.innerHTML = `
+        <input type="date" class="amount-history-date" value="${h.fromDate}" />
+        <input type="number" class="amount-history-amount" step="0.01" min="0" value="${h.amount}" />
+        <button type="button" class="item-action item-action--skip" data-remove-history>✕</button>
+      `;
+      list.appendChild(li);
+    });
   }
 
   function fillBudgetForm(b) {
     $('#budgetId').value = b.id;
     $('#budgetCategory').value = b.category;
+    UI.el.exposed_fillBudgetCategorySelectors && UI.el.exposed_fillBudgetCategorySelectors(b.category);
     $('#budgetSubcategory').value = b.subcategoryId || '';
     $('#budgetAmount').value = b.amount;
     $('#budgetIconPreview').textContent = b.icon || '💼';
@@ -175,6 +203,8 @@
     $('#creditCardMonthlyPayment').value = c.monthlyPayment;
     $('#creditCardCategory').value = c.category;
     $('#creditCardStartDate').value = c.startDate || '';
+    const ccIconPreview = $('#creditCardIconPreview');
+    if (ccIconPreview) ccIconPreview.textContent = c.icon || '💳';
   }
 
   // ---------- Modal openers (DOM + state, but UI via UI, state via A) ----------
@@ -186,6 +216,8 @@
     $('#btnConvertToBudget').style.display = 'none';
     $('#btnConvertToUnico').style.display = 'none';
     $('#expenseStartDate').value = M.toISODate(new Date());
+    fillAmountHistoryList('#expenseAmountHistory', []);
+    publishState();
     UI.el.exposed_fillExpenseCategorySelectors && UI.el.exposed_fillExpenseCategorySelectors('');
     UI.el.exposed_setExpenseType && UI.el.exposed_setExpenseType('fixed');
 
@@ -210,6 +242,7 @@
     $('#incomeId').value = '';
     $('#btnDeleteIncome').style.display = 'none';
     $('#incomeStartDate').value = M.toISODate(new Date());
+    fillAmountHistoryList('#incomeAmountHistory', []);
     UI.el.exposed_setIncomeType && UI.el.exposed_setIncomeType('recurring');
 
     if (id) {
@@ -231,6 +264,8 @@
     $('#budgetId').value = '';
     $('#btnDeleteBudget').style.display = 'none';
     $('#budgetStartDate').value = M.toISODate(new Date());
+    publishState();
+    UI.el.exposed_fillBudgetCategorySelectors && UI.el.exposed_fillBudgetCategorySelectors($('#budgetCategory').value);
     $('#budgetIconPreview').textContent = '💼';
 
     if (id) {
@@ -272,7 +307,8 @@
     $('#creditCardId').value = '';
     $('#btnDeleteCreditCard').style.display = 'none';
     $('#creditCardStartDate').value = M.toISODate(new Date());
-    $('#creditCardIconPreview').textContent = '💳';
+    const ccIconPreview = $('#creditCardIconPreview');
+    if (ccIconPreview) ccIconPreview.textContent = '💳';
 
     if (id) {
       const item = state.creditCards.find((c) => c.id === id);
@@ -541,8 +577,31 @@
     openSubcategoryForm(id);
   }
 
+  function editBudget(id) {
+    openBudgetForm(id);
+  }
+
+  function addAmountHistoryRow(kind) {
+    const listId = kind === 'expense' ? 'expenseAmountHistory' : 'incomeAmountHistory';
+    const list = $('#' + listId);
+    if (!list) return;
+    const li = document.createElement('li');
+    li.className = 'amount-history-item';
+    const today = M.toISODate(new Date());
+    li.innerHTML = `
+      <input type="date" class="amount-history-date" value="${today}" />
+      <input type="number" class="amount-history-amount" step="0.01" min="0" placeholder="0,00" />
+      <button type="button" class="item-action item-action--skip" data-remove-history>✕</button>
+    `;
+    list.appendChild(li);
+  }
+
+  function publishState() {
+    window.__APP_STATE__ = state;
+  }
   // ---------- Render ----------
   function render() {
+    publishState();
     updateMonthLabel();
     renderSummary();
     renderBudgets();
@@ -657,6 +716,7 @@
 
   // ---------- Persistence ----------
   function persist() {
+    publishState();
     S.save(state);
   }
 
@@ -754,6 +814,9 @@
     M.__onUpdateCCBalance = (id) => updateCCBalance(id);
     M.__onAddExtraPayment = (id) => addExtraPayment(id);
     M.__onEditSubcategory = (id) => editSubcategory(id);
+    M.__onEditBudget = (id) => editBudget(id);
+    M.__onEditExpense = (id) => openExpenseForm(id);
+    M.__onEditIncome = (id) => openIncomeForm(id);
   }
 
   // ---------- Event wiring ----------
@@ -797,7 +860,20 @@
         return;
       }
 
-      // 5) Botones por id (usamos closest para tolerar clicks en SVG/texto interno)
+      // 5) Seg buttons en modales (data-type dentro de un .segmented)
+      const seg = t.closest('.segmented .seg');
+      if (seg) {
+        const type = seg.dataset.type;
+        const container = seg.parentElement;
+        if (type === 'recurring' || type === 'extra') {
+          UI.el.exposed_setIncomeType && UI.el.exposed_setIncomeType(type);
+        } else {
+          UI.el.exposed_setExpenseType && UI.el.exposed_setExpenseType(type);
+        }
+        return;
+      }
+
+      // 6) Botones por id (usamos closest para tolerar clicks en SVG/texto interno)
       const btn = t.closest('button[id]');
       if (!btn) return;
       const id = btn.id;
@@ -830,9 +906,14 @@
         case 'btnBudgetIcon':
         case 'btnSubcategoryIcon':
         case 'btnCreditCardIcon':
-          // Sólo abrimos el picker si el botón realmente existe en el DOM;
-          // así evitamos depender de elementos que no estén en su modal.
           if ($('#' + id)) openIconPicker(id.replace('btn', '').replace('Icon', '').toLowerCase());
+          return;
+
+        case 'btnAddExpenseAmountChange':
+          addAmountHistoryRow('expense');
+          return;
+        case 'btnAddIncomeAmountChange':
+          addAmountHistoryRow('income');
           return;
 
         case 'btnDeleteExpense': {
@@ -941,6 +1022,24 @@
         if (open.length) UI.closeModal(open[open.length - 1].id);
       }
     });
+
+    document.addEventListener('change', (e) => {
+      const t = e.target;
+      if (t && t.id === 'expenseCategory') {
+        UI.el.exposed_fillExpenseCategorySelectors && UI.el.exposed_fillExpenseCategorySelectors(t.value);
+      } else if (t && t.id === 'budgetCategory') {
+        UI.el.exposed_fillBudgetCategorySelectors && UI.el.exposed_fillBudgetCategorySelectors(t.value);
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      const t = e.target;
+      const removeBtn = t.closest && t.closest('[data-remove-history]');
+      if (removeBtn) {
+        const li = removeBtn.closest('.amount-history-item');
+        if (li) li.remove();
+      }
+    });
   }
 
   function triggerImport() {
@@ -987,6 +1086,7 @@
   function init() {
     applyAppVersion();
     applyTheme();
+    publishState();
     bindEvents();
     bindSettings();
     wireModelsBridge();

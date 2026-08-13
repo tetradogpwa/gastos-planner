@@ -1,5 +1,5 @@
 // Service Worker para Mis Gastos PWA
-// build: 2026-08-11 v3.0.4 — toca esta línea en cada release para forzar la reinstalación del SW.
+// build: 2026-08-13 v3.0.5 — toca esta línea en cada release para forzar la reinstalación del SW.
 // (La versión real se lee de version.js; este comentario sólo sirve para que
 // el navegador detecte que el archivo del SW cambió.)
 importScripts('./version.js');

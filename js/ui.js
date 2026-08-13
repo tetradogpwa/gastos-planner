@@ -218,7 +218,10 @@
         el('span', { class: 'budget-item-free' },
           (over ? 'Excedido: ' : 'Libre: ') + _fmt(Math.abs(free))
         ),
-        el('button', { class: 'item-action item-action--edit' }, 'Editar')
+        el('button', {
+          class: 'item-action item-action--edit',
+          onclick: () => M.__onEditBudget && M.__onEditBudget(budget.id)
+        }, 'Editar')
       )
     );
   }
@@ -264,7 +267,7 @@
       if (countEl) countEl.textContent = pending.length;
       pending.forEach((e) => {
         const enriched = { ...e, _kind: 'expense', effectiveAmount: M.effectiveAmountAt(e, currentMonth), effectiveIcon: M.effectiveIconFor(e, state) };
-        list.appendChild(buildItemElement(enriched));
+        list.appendChild(buildItemElement(enriched, () => M.__onEditExpense && M.__onEditExpense(e.id)));
       });
     }
     return section;
@@ -281,7 +284,16 @@
         el('p', { class: 'empty-hint' }, 'Añade un gasto o ingreso para empezar.')
       ));
     } else {
-      all.forEach((item) => list.appendChild(buildItemElement(item)));
+      all.forEach((item) => list.appendChild(buildItemElement(item, () => {
+        if (!item.id) return;
+        if (item._kind === 'income') return M.__onEditIncome && M.__onEditIncome(item.id);
+        // Tarjeta virtual: abrimos la edición de la tarjeta
+        if (typeof item.id === 'string' && item.id.startsWith('cc-virtual-')) {
+          const cid = item.id.slice('cc-virtual-'.length);
+          return M.__onEditCreditCard && M.__onEditCreditCard(cid);
+        }
+        return M.__onEditExpense && M.__onEditExpense(item.id);
+      })));
     }
     const ccVirtual = state.creditCards
       .filter((c) => !c.inactive && M.appliesCreditCardToMonth(c, currentMonth))
@@ -290,7 +302,10 @@
         amount: c.monthlyPayment, type: 'fixed', category: c.category,
         effectiveAmount: c.monthlyPayment, effectiveIcon: c.icon || '💳'
       }));
-    ccVirtual.forEach((item) => list.appendChild(buildItemElement(item)));
+    ccVirtual.forEach((item) => list.appendChild(buildItemElement(item, () => {
+      const cid = item.id.slice('cc-virtual-'.length);
+      return M.__onEditCreditCard && M.__onEditCreditCard(cid);
+    })));
     return el('div', { class: 'section' },
     el('div', { class: 'section-header' },
       el('h2', { class: 'section-title' }, 'Detalle del mes'),
@@ -346,7 +361,7 @@
     } else {
       items.forEach((e) => {
         const enriched = { ...e, _kind: 'expense', effectiveAmount: e.amount, effectiveIcon: M.effectiveIconFor(e, state) };
-        list.appendChild(buildItemElement(enriched));
+        list.appendChild(buildItemElement(enriched, () => M.__onEditExpense && M.__onEditExpense(e.id)));
       });
     }
     return el('div', { class: 'section' },
@@ -374,7 +389,7 @@
     } else {
       items.forEach((i) => {
         const enriched = { ...i, _kind: 'income', effectiveAmount: i.amount, effectiveIcon: M.effectiveIconFor(i, state) };
-        list.appendChild(buildItemElement(enriched));
+        list.appendChild(buildItemElement(enriched, () => M.__onEditIncome && M.__onEditIncome(i.id)));
       });
     }
     return el('div', { class: 'section' },
@@ -538,6 +553,206 @@
     }
   }
 
+  // ---------- Form helpers (expuestos para app.js) ----------
+  function _setActiveSeg(segContainer, type) {
+    if (!segContainer) return;
+    const segs = segContainer.querySelectorAll('.seg');
+    segs.forEach((s) => {
+      if (s.dataset.type === type) s.classList.add('seg-active');
+      else s.classList.remove('seg-active');
+    });
+  }
+
+  function exposed_setExpenseType(type) {
+    const seg = document.getElementById('expenseTypeSeg');
+    _setActiveSeg(seg, type);
+
+    const dateWrap = document.getElementById('expenseDateWrap');
+    const endWrap = document.getElementById('expenseEndWrap');
+    const monthWrap = document.getElementById('expenseMonthWrap');
+    const hint = document.getElementById('expenseTypeHint');
+
+    if (type === 'unico') {
+      if (dateWrap) dateWrap.style.display = 'none';
+      if (endWrap) endWrap.style.display = 'none';
+      if (monthWrap) monthWrap.style.display = '';
+      if (hint) hint.textContent = 'Para gastos puntuales, como una compra concreta. Aparecerá sólo en el mes elegido.';
+    } else {
+      if (dateWrap) dateWrap.style.display = '';
+      if (endWrap) endWrap.style.display = (type === 'temporary') ? '' : 'none';
+      if (monthWrap) monthWrap.style.display = 'none';
+      if (hint) hint.textContent = type === 'temporary'
+        ? 'Se repite cada mes hasta la fecha de fin. Útil para gastos con fecha conocida de fin.'
+        : 'Se repite cada mes hasta que lo elimines. Para compras del día a día vinculadas a un presupuesto, usa el botón "+".';
+    }
+  }
+
+  function exposed_setIncomeType(type) {
+    const seg = document.getElementById('incomeTypeSeg');
+    _setActiveSeg(seg, type);
+
+    const dateWrap = document.getElementById('incomeDateWrap');
+    const endWrap = document.getElementById('incomeEndWrap');
+    const monthWrap = document.getElementById('incomeMonthWrap');
+    const hint = document.getElementById('incomeTypeHint');
+
+    if (type === 'extra') {
+      if (dateWrap) dateWrap.style.display = 'none';
+      if (endWrap) endWrap.style.display = 'none';
+      if (monthWrap) monthWrap.style.display = '';
+      if (hint) hint.textContent = 'Ingreso puntual. Aparecerá solo en el mes elegido.';
+    } else {
+      if (dateWrap) dateWrap.style.display = '';
+      if (endWrap) endWrap.style.display = 'none';
+      if (monthWrap) monthWrap.style.display = 'none';
+      if (hint) hint.textContent = 'Se repite cada mes hasta que lo elimines.';
+    }
+  }
+
+  function exposed_fillExpenseCategorySelectors(category) {
+    // Subcategorías: las que pertenezcan a la categoría seleccionada
+    const subSelect = document.getElementById('expenseSubcategory');
+    const subHint = document.getElementById('expenseSubcategoryHint');
+    if (subSelect) {
+      const previous = subSelect.value;
+      subSelect.innerHTML = '';
+      const opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = '— Ninguna —';
+      subSelect.appendChild(opt0);
+      let count = 0;
+      if (category && M.getSubcategoriesForCategory) {
+        const subs = M.getSubcategoriesForCategory(window.__APP_STATE__ || { subcategories: [] }, category);
+        subs.forEach((s) => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = `${s.icon} ${s.label}`;
+          subSelect.appendChild(opt);
+          count++;
+        });
+      }
+      if (subHint) {
+        if (count === 0) {
+          subHint.style.display = '';
+          subHint.textContent = 'No tienes subcategorías para esta categoría. Crea una desde Categorías.';
+        } else {
+          subHint.style.display = 'none';
+        }
+      }
+      // Restaurar valor si sigue siendo válido
+      if (previous && Array.from(subSelect.options).some((o) => o.value === previous)) {
+        subSelect.value = previous;
+      }
+    }
+
+    // Presupuestos: los que pertenezcan a la categoría seleccionada
+    const budgetSelect = document.getElementById('expenseBudget');
+    if (budgetSelect) {
+      const previous = budgetSelect.value;
+      budgetSelect.innerHTML = '';
+      const opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = '— Sin asignar —';
+      budgetSelect.appendChild(opt0);
+      const state = window.__APP_STATE__ || { budgets: [] };
+      state.budgets
+        .filter((b) => !category || b.category === category)
+        .forEach((b) => {
+          const opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = `${b.icon || '🎯'} ${_label(b.category)} — ${M.formatMoney(b.amount)}`;
+          budgetSelect.appendChild(opt);
+        });
+      if (previous && Array.from(budgetSelect.options).some((o) => o.value === previous)) {
+        budgetSelect.value = previous;
+      }
+    }
+
+    // Tarjetas de crédito: todas (no se filtran por categoría)
+    const ccSelect = document.getElementById('expenseCreditCard');
+    if (ccSelect) {
+      const previous = ccSelect.value;
+      ccSelect.innerHTML = '';
+      const opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = '— Sin tarjeta —';
+      ccSelect.appendChild(opt0);
+      const state = window.__APP_STATE__ || { creditCards: [] };
+      state.creditCards
+        .filter((c) => !c.inactive)
+        .forEach((c) => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = `${c.icon || '💳'} ${c.name}`;
+          ccSelect.appendChild(opt);
+        });
+      if (previous && Array.from(ccSelect.options).some((o) => o.value === previous)) {
+        ccSelect.value = previous;
+      }
+    }
+  }
+
+  function exposed_fillBudgetCategorySelectors(category) {
+    const subSelect = document.getElementById('budgetSubcategory');
+    if (subSelect) {
+      const previous = subSelect.value;
+      subSelect.innerHTML = '';
+      const opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = '— Todas las de la categoría —';
+      subSelect.appendChild(opt0);
+      const state = window.__APP_STATE__ || { subcategories: [] };
+      let count = 0;
+      if (category && M.getSubcategoriesForCategory) {
+        M.getSubcategoriesForCategory(state, category).forEach((s) => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = `${s.icon} ${s.label}`;
+          subSelect.appendChild(opt);
+          count++;
+        });
+      }
+      if (count === 0 && previous) {
+        subSelect.value = '';
+      } else if (previous && Array.from(subSelect.options).some((o) => o.value === previous)) {
+        subSelect.value = previous;
+      }
+    }
+  }
+
+  // ---------- Icon picker ----------
+  let _iconPickerCallback = null;
+  function exposed_openIconPicker(currentIcon, onSelect) {
+    const body = document.getElementById('iconPickerBody');
+    if (!body) return;
+    _iconPickerCallback = onSelect || null;
+    body.innerHTML = '';
+    M.ICON_OPTIONS.forEach((group) => {
+      const groupEl = document.createElement('div');
+      groupEl.className = 'picker-group';
+      const title = document.createElement('div');
+      title.className = 'picker-group-title';
+      title.textContent = group.group;
+      groupEl.appendChild(title);
+      const grid = document.createElement('div');
+      grid.className = 'picker-grid';
+      group.icons.forEach((ic) => {
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'picker-cell' + (ic === currentIcon ? ' is-active' : '');
+        cell.textContent = ic;
+        cell.addEventListener('click', () => {
+          if (_iconPickerCallback) _iconPickerCallback(ic);
+          closeModal('iconPickerPopup');
+        });
+        grid.appendChild(cell);
+      });
+      groupEl.appendChild(grid);
+      body.appendChild(groupEl);
+    });
+    openModal('iconPickerPopup');
+  }
+
   // ---------- API pública ----------
   global.UI = {
     buildItemElement,
@@ -554,6 +769,19 @@
     buildSubcategoriesSection,
     openModal,
     closeModal,
-    el
+    el,
+    exposed_setExpenseType,
+    exposed_setIncomeType,
+    exposed_fillExpenseCategorySelectors,
+    exposed_fillBudgetCategorySelectors,
+    exposed_openIconPicker
   };
+  // Aliases en UI.el para compatibilidad con código existente que usa UI.el.exposed_*
+  global.UI.el = Object.assign({}, el, {
+    exposed_setExpenseType,
+    exposed_setIncomeType,
+    exposed_fillExpenseCategorySelectors,
+    exposed_fillBudgetCategorySelectors,
+    exposed_openIconPicker
+  });
 })(window);

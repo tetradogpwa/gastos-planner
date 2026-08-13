@@ -99,7 +99,7 @@ suite('Actions · Tarjetas · CRUD básico', () => {
     );
     assertThrows(
       () => A.createCreditCard(freshState(), { name: 'X', monthlyPayment: 50, category: 'extras' }),
-      /Importe no válido/
+      /Límite de crédito no válido/
     );
     assertThrows(
       () => A.createCreditCard(freshState(), { name: 'X', maxLimit: 1000, monthlyPayment: 50, category: '' }),
@@ -107,7 +107,7 @@ suite('Actions · Tarjetas · CRUD básico', () => {
     );
     assertThrows(
       () => A.createCreditCard(freshState(), { name: 'X', maxLimit: -10, monthlyPayment: 50, category: 'extras' }),
-      /Importe no válido/
+      /Límite de crédito no válido/
     );
   });
 

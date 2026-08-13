@@ -60,8 +60,11 @@
 
   function _validateCreditCardPayload(p) {
     if (!p.name || !p.name.trim()) throw new Error('Nombre vacío');
-    if (p.amount === undefined || p.amount === null || isNaN(p.amount) || p.amount < 0) {
-      throw new Error('Importe no válido');
+    if (p.maxLimit === undefined || p.maxLimit === null || isNaN(p.maxLimit) || p.maxLimit < 0) {
+      throw new Error('Límite de crédito no válido');
+    }
+    if (p.monthlyPayment === undefined || p.monthlyPayment === null || isNaN(p.monthlyPayment) || p.monthlyPayment < 0) {
+      throw new Error('Cuota mensual no válida');
     }
     if (!p.category) throw new Error('Categoría no especificada');
   }

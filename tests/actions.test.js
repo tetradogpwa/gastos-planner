@@ -329,7 +329,7 @@ suite('Actions · Subcategorías', () => {
 suite('Actions · Tarjetas de crédito (CRUD)', () => {
   test('createCreditCard valida', () => {
     assertThrows(() => A.createCreditCard(freshState(), { name: '', maxLimit: 1000, monthlyPayment: 50, category: 'extras' }), /Nombre vacío/);
-    assertThrows(() => A.createCreditCard(freshState(), { name: 'X', monthlyPayment: 50, category: 'extras' }), /Importe no válido/);
+    assertThrows(() => A.createCreditCard(freshState(), { name: 'X', monthlyPayment: 50, category: 'extras' }), /Límite de crédito no válido/);
   });
 
   test('deleteCreditCard desvincula gastos', () => {
