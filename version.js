@@ -1,17 +1,20 @@
 /*
- * Fuente ÚNICA de la versión de la app.
+ * Fuente ÚNICA de la versión que ve la página.
  *
- *  - El service worker la importa con importScripts('./version.js').
- *  - La página la carga con <script src="./version.js"></script>.
+ *  - La página la carga con <script src="./version.js"></script> y
+ *    usa window.APP_VERSION para mostrar la versión en la UI.
+ *
+ * IMPORTANTE: service-worker.js NO importa este archivo. Tiene su
+ * PROPIA copia literal de APP_VERSION porque el navegador sólo detecta
+ * cambios del SW comparando bytes de service-worker.js; si la versión
+ * se leyera vía importScripts(), cambiar este archivo no forzaría la
+ * reinstalación del SW y los usuarios se quedarían con caché vieja.
  *
  * Para sacar una nueva versión:
- *   1) Edita SOLO el valor de APP_VERSION en este archivo.
- *   2) Toca también el comentario "build:" de service-worker.js para
- *      forzar al navegador a detectar el cambio y reinstalar el SW.
+ *   1) Edita APP_VERSION en ESTE archivo (version.js).
+ *   2) Edita TAMBIÉN APP_VERSION en service-worker.js con el mismo
+ *      valor. Es la ÚNICA duplicación permitida y es obligatoria.
  *   3) Redeploy.
- *
- * NO dupliques el número en index.html, service-worker.js ni en
- * ningún otro sitio: ambos lo leen de aquí.
  */
 (function () {
   'use strict';

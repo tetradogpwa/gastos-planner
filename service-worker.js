@@ -1,10 +1,15 @@
 // Service Worker para Mis Gastos PWA
-// build: 2026-08-13 v3.0.5 — toca esta línea en cada release para forzar la reinstalación del SW.
-// (La versión real se lee de version.js; este comentario sólo sirve para que
-// el navegador detecte que el archivo del SW cambió.)
-importScripts('./version.js');
+//
+// IMPORTANTE: la versión está DUPLICADA aquí a propósito.
+// El navegador detecta cambios del SW comparando bytes de este archivo;
+// si la versión sólo se leyera via importScripts('./version.js'), cambiar
+// version.js NO provocaría la reinstalación del SW y los usuarios se
+// quedarían con la versión vieja cacheada.
+// Por eso APP_VERSION vive como literal aquí, y hay que mantenerla en
+// sincronía con version.js al sacar un release.
+const APP_VERSION = 'v3.0.5';
 
-const CACHE_NAME = 'mis-gastos-' + self.APP_VERSION;
+const CACHE_NAME = 'mis-gastos-' + APP_VERSION;
 const ASSETS = [
   './',
   './index.html',
