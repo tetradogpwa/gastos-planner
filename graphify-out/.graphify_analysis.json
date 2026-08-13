@@ -1,0 +1,451 @@
+{
+  "communities": {
+    "0": [
+      "js_models",
+      "js_models_addmonths",
+      "js_models_appliesbudgettomonth",
+      "js_models_appliescreditcardtomonth",
+      "js_models_appliestomonth",
+      "js_models_comparemonthkeys",
+      "js_models_deletesubcategory",
+      "js_models_effectiveamountat",
+      "js_models_effectiveiconfor",
+      "js_models_findconflictingbudget",
+      "js_models_firstofmonth",
+      "js_models_formatmoney",
+      "js_models_formatshortdate",
+      "js_models_getbudgetprogress",
+      "js_models_getbudgetsformonth",
+      "js_models_getcreditcardprogress",
+      "js_models_getcreditcardsformonth",
+      "js_models_getitemsformonth",
+      "js_models_getlatestbalance",
+      "js_models_getpendingmandatory",
+      "js_models_getsubcategoriesforcategory",
+      "js_models_getsubcategory",
+      "js_models_gettimeline",
+      "js_models_isendingsoon",
+      "js_models_ispendingoptional",
+      "js_models_lastofmonth",
+      "js_models_monthkeytolabel",
+      "js_models_monthkeytoshort",
+      "js_models_monthsforitem",
+      "js_models_newstate",
+      "js_models_normalizeamounthistory",
+      "js_models_normalizebalanceentry",
+      "js_models_normalizebudget",
+      "js_models_normalizecreditcard",
+      "js_models_normalizeexpense",
+      "js_models_normalizeincome",
+      "js_models_normalizesettings",
+      "js_models_normalizesubcategory",
+      "js_models_parseisodate",
+      "js_models_sortitem",
+      "js_models_statedaterange",
+      "js_models_summarize",
+      "js_models_summarizebudgets",
+      "js_models_summarizecreditcards",
+      "js_models_todaymonthkey",
+      "js_models_togglepaidmonth",
+      "js_models_togglependingmonth",
+      "js_models_toggleskippedmonth",
+      "js_models_toisodate",
+      "js_models_uuid",
+      "js_models_validitytext",
+      "js_models_wouldapplyifmandatory"
+    ],
+    "1": [
+      "js_actions",
+      "js_actions_addextrapayment",
+      "js_actions_addtolist",
+      "js_actions_applyimport",
+      "js_actions_convertexpensetobudget",
+      "js_actions_convertexpensetounico",
+      "js_actions_createbudget",
+      "js_actions_createcreditcard",
+      "js_actions_createexpense",
+      "js_actions_createincome",
+      "js_actions_createsubcategory",
+      "js_actions_deletebudget",
+      "js_actions_deletecreditcard",
+      "js_actions_deleteexpense",
+      "js_actions_deleteexpensebudgetlink",
+      "js_actions_deleteincome",
+      "js_actions_deletesubcategory",
+      "js_actions_getbudget",
+      "js_actions_getcreditcard",
+      "js_actions_getexpense",
+      "js_actions_getincome",
+      "js_actions_getitem",
+      "js_actions_getsubcategory",
+      "js_actions_paycreditcardmonth",
+      "js_actions_paypendingdebt",
+      "js_actions_recalccreditcardbalance",
+      "js_actions_removefromlist",
+      "js_actions_resetstate",
+      "js_actions_seedexampledata",
+      "js_actions_setbalance",
+      "js_actions_skipcreditcardmonth",
+      "js_actions_togglecreditcardinactive",
+      "js_actions_toggleinactive",
+      "js_actions_togglepaid",
+      "js_actions_togglependingmandatory",
+      "js_actions_toggleskipped",
+      "js_actions_updatebudget",
+      "js_actions_updatecreditcard",
+      "js_actions_updatecreditcardbalance",
+      "js_actions_updateexpense",
+      "js_actions_updateincome",
+      "js_actions_updateinlist",
+      "js_actions_updatesettings",
+      "js_actions_updatesubcategory",
+      "js_actions_validatebudgetpayload",
+      "js_actions_validatecreditcardpayload",
+      "js_actions_validateexpensepayload",
+      "js_actions_validateincomepayload",
+      "js_actions_validatesubcategorypayload"
+    ],
+    "2": [
+      "js_ui",
+      "js_ui_buildallexpensessection",
+      "js_ui_buildallincomesection",
+      "js_ui_buildbalancesection",
+      "js_ui_buildbudgetprogress",
+      "js_ui_buildbudgetsection",
+      "js_ui_buildcreditcardsection",
+      "js_ui_buildinactiveexpensessection",
+      "js_ui_builditemactions",
+      "js_ui_builditemelement",
+      "js_ui_buildmonthitemssection",
+      "js_ui_buildpendingsection",
+      "js_ui_buildsubcategoriessection",
+      "js_ui_buildsubcategoryitem",
+      "js_ui_buildsummarycards",
+      "js_ui_buildtimelinesection",
+      "js_ui_closemodal",
+      "js_ui_el",
+      "js_ui_exposed_fillbudgetcategoryselectors",
+      "js_ui_exposed_fillexpensecategoryselectors",
+      "js_ui_exposed_openiconpicker",
+      "js_ui_exposed_setexpensetype",
+      "js_ui_exposed_setincometype",
+      "js_ui_fmt",
+      "js_ui_label",
+      "js_ui_openmodal",
+      "js_ui_renderbalancecontent",
+      "js_ui_setactiveseg"
+    ],
+    "3": [
+      "js_app",
+      "js_app_addamounthistoryrow",
+      "js_app_changemonth",
+      "js_app_openiconpicker",
+      "js_app_paypendingdebt",
+      "js_app_readbudgetform",
+      "js_app_readextrapaymentform",
+      "js_app_readsetbalanceform",
+      "js_app_readsubcategoryform",
+      "js_app_readupdatebalanceform",
+      "js_app_render",
+      "js_app_renderallexpenses",
+      "js_app_renderallincome",
+      "js_app_renderbalancesection",
+      "js_app_renderbudgets",
+      "js_app_rendercreditcardsview",
+      "js_app_renderinactiveexpenses",
+      "js_app_rendermonthitems",
+      "js_app_renderpending",
+      "js_app_rendersubcategoriesview",
+      "js_app_rendersummary",
+      "js_app_rendertimeline",
+      "js_app_setview",
+      "js_app_toggleskipped",
+      "js_app_updatemonthlabel"
+    ],
+    "4": [
+      "js_app_bindevents",
+      "js_app_closemodal",
+      "js_app_openconverttobudget",
+      "js_app_openconverttounico",
+      "js_app_opensetbalancemodal",
+      "js_app_persist",
+      "js_app_readcreditcardform",
+      "js_app_submitbudgetform",
+      "js_app_submitcreditcardform",
+      "js_app_submitexpenseform",
+      "js_app_submitextrapayment",
+      "js_app_submitincomeform",
+      "js_app_submitsetbalance",
+      "js_app_submitsubcategoryform",
+      "js_app_submitupdatebalance",
+      "js_app_toast",
+      "js_app_triggerimport"
+    ],
+    "5": [
+      "tests_run",
+      "tests_run_assert",
+      "tests_run_assertdeepequal",
+      "tests_run_assertequal",
+      "tests_run_assertnothrow",
+      "tests_run_assertthrows",
+      "tests_run_context",
+      "tests_run_fs",
+      "tests_run_loadscript",
+      "tests_run_path",
+      "tests_run_root",
+      "tests_run_sandbox",
+      "tests_run_suite",
+      "tests_run_test",
+      "tests_run_testfiles",
+      "tests_run_tests",
+      "tests_run_vm"
+    ],
+    "6": [
+      "manifest",
+      "manifest_background_color",
+      "manifest_categories",
+      "manifest_description",
+      "manifest_display",
+      "manifest_icons",
+      "manifest_lang",
+      "manifest_name",
+      "manifest_orientation",
+      "manifest_scope",
+      "manifest_short_name",
+      "manifest_start_url",
+      "manifest_theme_color",
+      "ref_finance",
+      "ref_productivity"
+    ],
+    "7": [
+      "js_app_addextrapayment",
+      "js_app_editcreditcard",
+      "js_app_fillcreditcardform",
+      "js_app_opencreditcardform",
+      "js_app_openextrapaymentmodal",
+      "js_app_openupdatebalancemodal",
+      "js_app_toggleinactive",
+      "js_app_toggleinactivecc",
+      "js_app_togglepaid",
+      "js_app_togglepaycc",
+      "js_app_togglepending",
+      "js_app_toggleskipcc",
+      "js_app_updateccbalance",
+      "js_app_wiremodelsbridge"
+    ],
+    "8": [
+      "js_app_applyappversion",
+      "js_app_applytheme",
+      "js_app_bindsettings",
+      "js_app_editbudget",
+      "js_app_fillbudgetform",
+      "js_app_init",
+      "js_app_openbudgetform",
+      "js_app_publishstate"
+    ],
+    "9": [
+      "js_storage",
+      "js_storage_clear",
+      "js_storage_exportjson",
+      "js_storage_importfromfile",
+      "js_storage_load",
+      "js_storage_migrate",
+      "js_storage_save"
+    ],
+    "10": [
+      "build_icons",
+      "build_icons_lerp",
+      "build_icons_main",
+      "build_icons_make_icon",
+      "build_icons_rationale_1",
+      "image"
+    ],
+    "11": [
+      "js_app_edititem",
+      "js_app_fillamounthistorylist",
+      "js_app_fillexpenseform",
+      "js_app_fillincomeform",
+      "js_app_openexpenseform",
+      "js_app_openincomeform"
+    ],
+    "12": [
+      "js_app_readamounthistoryfromlist",
+      "js_app_readexpenseamounthistory",
+      "js_app_readexpenseform",
+      "js_app_readincomeamounthistory",
+      "js_app_readincomeform"
+    ],
+    "13": [
+      "tests_import_test",
+      "tests_import_test_fs",
+      "tests_import_test_loaduserjson",
+      "tests_import_test_path"
+    ],
+    "14": [
+      "js_app_editsubcategory",
+      "js_app_fillsubcategoryform",
+      "js_app_opensubcategoryform"
+    ],
+    "15": [
+      "tests_balance_test",
+      "tests_balance_test_calcrestomespasado",
+      "tests_balance_test_freshstate"
+    ],
+    "16": [
+      "tests_creditcards_test",
+      "tests_creditcards_test_card",
+      "tests_creditcards_test_freshstate"
+    ],
+    "17": [
+      "service_worker",
+      "service_worker_assets"
+    ],
+    "18": [
+      "tests_actions_test",
+      "tests_actions_test_freshstate"
+    ],
+    "19": [
+      "tests_models_test",
+      "tests_models_test_exp"
+    ],
+    "20": [
+      "version"
+    ]
+  },
+  "cohesion": {
+    "0": 0.08597285067873303,
+    "1": 0.10119047619047619,
+    "2": 0.1693121693121693,
+    "3": 0.13666666666666666,
+    "4": 0.35294117647058826,
+    "5": 0.1323529411764706,
+    "6": 0.13333333333333333,
+    "7": 0.14285714285714285,
+    "8": 0.2857142857142857,
+    "9": 0.38095238095238093,
+    "10": 0.4666666666666667,
+    "11": 0.5333333333333333,
+    "12": 0.4,
+    "13": 0.5,
+    "14": 0.6666666666666666,
+    "15": 0.6666666666666666,
+    "16": 0.6666666666666666,
+    "17": 1.0,
+    "18": 1.0,
+    "19": 1.0,
+    "20": 1.0
+  },
+  "gods": [
+    {
+      "id": "js_app_render",
+      "label": "render()",
+      "degree": 37
+    },
+    {
+      "id": "js_app_bindevents",
+      "label": "bindEvents()",
+      "degree": 30
+    },
+    {
+      "id": "js_app_persist",
+      "label": "persist()",
+      "degree": 23
+    },
+    {
+      "id": "js_actions_updateinlist",
+      "label": "_updateInList()",
+      "degree": 20
+    },
+    {
+      "id": "js_app_toast",
+      "label": "toast()",
+      "degree": 20
+    },
+    {
+      "id": "js_app_wiremodelsbridge",
+      "label": "wireModelsBridge()",
+      "degree": 18
+    },
+    {
+      "id": "js_ui_el",
+      "label": "el()",
+      "degree": 16
+    },
+    {
+      "id": "js_app_closemodal",
+      "label": "closeModal()",
+      "degree": 12
+    },
+    {
+      "id": "js_actions_getexpense",
+      "label": "_getExpense()",
+      "degree": 11
+    },
+    {
+      "id": "js_actions_addtolist",
+      "label": "_addToList()",
+      "degree": 10
+    }
+  ],
+  "surprises": [
+    {
+      "source": "submitExpenseForm()",
+      "target": "readExpenseForm()",
+      "source_files": [
+        "js/app.js",
+        "js/app.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 12 \u2192 community 4"
+    },
+    {
+      "source": "submitBudgetForm()",
+      "target": "readBudgetForm()",
+      "source_files": [
+        "js/app.js",
+        "js/app.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 3 \u2192 community 4"
+    },
+    {
+      "source": "bindEvents()",
+      "target": "openExpenseForm()",
+      "source_files": [
+        "js/app.js",
+        "js/app.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 11 \u2192 community 4"
+    },
+    {
+      "source": "openExpenseForm()",
+      "target": "publishState()",
+      "source_files": [
+        "js/app.js",
+        "js/app.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 11 \u2192 community 8"
+    },
+    {
+      "source": "wireModelsBridge()",
+      "target": "openExpenseForm()",
+      "source_files": [
+        "js/app.js",
+        "js/app.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 11 \u2192 community 7"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}
